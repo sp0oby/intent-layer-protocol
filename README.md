@@ -20,7 +20,7 @@ This repository contains the **protocol specification**, a **working dev skeleto
 - [For new contributors](#for-new-contributors)
 - [Quickstart](#quickstart)
 - [Scripts & quality gates](#scripts--quality-gates)
-- [Project board and issues (maintainers)](#project-board-and-issues-maintainers)
+- [Maintainers](#maintainers)
 - [Contributing](#contributing)
 - [Security](#security)
 - [License](#license)
@@ -132,19 +132,9 @@ cd contracts && forge install foundry-rs/forge-std --no-commit
 
 ---
 
-## Project board and issues (maintainers)
+## Maintainers
 
-After `gh auth login` and `gh auth refresh -s project`, run:
-
-```bash
-./scripts/bootstrap-github-project-and-issues.sh
-```
-
-This creates a GitHub **Project** titled `Intent Layer MVP` (override with `GITHUB_PROJECT_TITLE`), links it to this repo, and opens labeled **issues** for Week 1–4 work. Rename board columns in the GitHub UI if you want `Backlog / In progress / Review / Done`.
-
-**If linking failed** with `different owner from '@me'`, that happened because `gh project link` expects `--repo intent-layer-protocol` (short name), not `owner/repo`. Fix: pull latest script, or run `gh project link 1 --owner sp0oby --repo intent-layer-protocol`. To reuse project **1** and run the rest (labels + issues): `EXISTING_PROJECT_NUMBER=1 ./scripts/bootstrap-github-project-and-issues.sh`. Link only: add `SKIP_ISSUES=1`.
-
-Manual templates and copy-paste bodies also live in [`docs/GITHUB_PROJECT_AND_ISSUES.md`](docs/GITHUB_PROJECT_AND_ISSUES.md).
+Backlog hygiene only (GitHub Projects, labels, bootstrapping issues): see [**docs/GITHUB_PROJECT_AND_ISSUES.md**](docs/GITHUB_PROJECT_AND_ISSUES.md). Typical contributors can skip this.
 
 ---
 

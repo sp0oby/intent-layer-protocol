@@ -5,6 +5,18 @@
 
 **Automated option:** from the repo root, run `./scripts/bootstrap-github-project-and-issues.sh` (after `gh auth login` and `gh auth refresh -s project`) to create the project, link it to this repository, and open the issues below.
 
+### Script details and troubleshooting
+
+After authenticating:
+
+```bash
+./scripts/bootstrap-github-project-and-issues.sh
+```
+
+This creates a GitHub **Project** titled `Intent Layer MVP` (override with `GITHUB_PROJECT_TITLE`), links it to this repo, and opens labeled **issues** for Week 1–4 work. Rename board columns in the GitHub UI if you want `Backlog / In progress / Review / Done`.
+
+**If linking failed** with `different owner from '@me'`, `gh project link` expects `--repo intent-layer-protocol` (short name), not `owner/repo`. Fix: pull the latest script, or run `gh project link 1 --owner sp0oby --repo intent-layer-protocol`. To reuse project **1** and run the rest (labels + issues): `EXISTING_PROJECT_NUMBER=1 ./scripts/bootstrap-github-project-and-issues.sh`. Link only: add `SKIP_ISSUES=1`.
+
 ---
 
 This guide also supports manual setup via the GitHub web UI or one-off `gh issue create` commands.
