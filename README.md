@@ -70,7 +70,7 @@ This repository is currently unlicensed. Add a license file (e.g., MIT) before b
 
 ## Contact
 Founder: @sp0oby (GitHub)
-Project email: contact@intentlayer.org (placeholder)
+Project email: 
 
 ---
 
