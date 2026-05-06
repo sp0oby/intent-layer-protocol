@@ -1,4 +1,9 @@
-# Intent Protocol Layer - Technology Stack
+# Intent Protocol Layer — Technology Stack
+
+**Audience:** Engineers joining the project · **Version:** 1.0 · **Status:** Baseline choices for Phase 1; adjust via ADR or PR when swapping tools  
+**See also:** [README](README.md) · [Architecture](ARCHITECTURE.md) · [MVP specification](MVP_SPECIFICATION.md) · [Contributing](CONTRIBUTING.md)
+
+---
 
 ## Philosophy
 
@@ -247,13 +252,18 @@ const useStore = create((set) => ({
 }));
 ```
 
-**Styling:**
+**UI & motion:**
 ```typescript
-// Tailwind CSS + headlessui
-import { Dialog } from '@headlessui/react';
+// Tailwind CSS + shadcn/ui (Radix primitives) + Framer Motion
+import { Button } from '@/components/ui/button';
+import { motion } from 'framer-motion';
 
-export function Modal() {
-    return <Dialog className="fixed inset-0">...</Dialog>;
+export function Cta() {
+  return (
+    <motion.div whileHover={{ scale: 1.02 }}>
+      <Button variant="default">Create intent</Button>
+    </motion.div>
+  );
 }
 ```
 
@@ -286,11 +296,12 @@ frontend/
 │   ├── page.tsx            (landing page)
 │   ├── swap/
 │   │   └── page.tsx        (swap interface)
+│   ├── intent/
+│   │   └── [id]/page.tsx   (intent status)
 │   ├── history/
 │   │   └── page.tsx        (transaction history)
 │   └── api/
-│       ├── intents.ts      (backend API)
-│       └── solvers.ts
+│       └── intents/route.ts  (dummy or proxy API for local dev)
 ├── components/
 │   ├── Navbar.tsx
 │   ├── SwapForm.tsx
@@ -313,14 +324,14 @@ frontend/
 ```json
 {
   "dependencies": {
-    "next": "^14.0.0",
-    "react": "^18.2.0",
+    "next": "^14.2.0",
+    "react": "^18.3.0",
     "wagmi": "^2.0.0",
     "viem": "^2.0.0",
     "@tanstack/react-query": "^5.0.0",
-    "zustand": "^4.4.0",
-    "tailwindcss": "^3.3.0",
-    "@headlessui/react": "^1.7.0",
+    "zustand": "^5.0.0",
+    "tailwindcss": "^3.4.0",
+    "framer-motion": "^11.0.0",
     "recharts": "^2.10.0"
   }
 }
@@ -532,6 +543,10 @@ logger.info({ intentHash }, 'Intent submitted');
 
 ---
 
-**Tech Stack Version:** 1.0  
-**Last Updated:** 2026-05-06  
-**Status:** Ready for development
+## Document control
+
+| | |
+|:---|:---|
+| **Version** | 1.0 |
+| **Last updated** | 2026-05-06 |
+| **Status** | Active baseline — bump version when stack changes materially |

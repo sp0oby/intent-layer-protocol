@@ -1,4 +1,9 @@
-# Intent Protocol Layer - Risk Analysis & Mitigation
+# Intent Protocol Layer — Risk Analysis & Mitigation
+
+**Audience:** Founders, engineers, future auditors · **Version:** 1.0 · **Status:** Complete for planning; revisit quarterly or before mainnet scaling  
+**See also:** [README](README.md) · [Architecture](ARCHITECTURE.md) · [MVP specification](MVP_SPECIFICATION.md) · [Contributing](CONTRIBUTING.md)
+
+---
 
 ## Overview
 
@@ -40,11 +45,10 @@ Could result in:
    - [ ] Property-based testing: Invariants hold
    - [ ] Integration tests: Full settlement flow
 
-3. **Professional Audit (Week 7-8)**
-   - [ ] Partner with reputable firm (e.g., Trail of Bits, OpenZeppelin)
-   - [ ] 1-2 week audit
-   - [ ] Fix critical/high issues before mainnet
-   - [ ] Cost: $15k-30k (necessary)
+3. **External Audit (as budget allows)**
+   - [ ] Prioritize internal review + automated tooling first
+   - [ ] When raising limits or approaching broad mainnet launch, engage a reputable firm (e.g., Trail of Bits, OpenZeppelin, Consensys Diligence)
+   - [ ] Typical engagement: 1–2 weeks plus remediation; budget historically ~$15k–$30k+ depending on scope
 
 4. **Conservative Deployment (Week 10-12)**
    - [ ] Testnet: 100+ transactions, 1 week
@@ -444,16 +448,26 @@ If ANY of these happen, reconsider or pivot:
 
 ---
 
-## Success Metrics (No Red Flags = Go)
+## Success metrics (release readiness)
 
-✅ Smart contract audit passes with <5 minor issues  
-✅ LayerZero delivers 99%+ message success rate  
-✅ Matching engine passes 100+ test cases  
-✅ Gas costs within 20% of estimate  
-✅ 50+ beta users willing to use protocol  
-✅ No founder burnout at week 8  
-✅ Legal review: "No major red flags"  
+These are **directional** gates — calibrate to stage and budget (e.g. testnet vs staged mainnet).
 
-**Document Version:** 1.0  
-**Last Updated:** 2026-05-06  
-**Status:** Risk assessment complete
+| Signal | Target |
+|:---|:---|
+| **Smart contract assurance** | Internal review + automated tooling clean; **external audit** completed before high-limit mainnet when budget allows |
+| **LayerZero reliability** | ≥99% message success in staging under representative load |
+| **Matching engine** | Passes an expanding regression suite (100+ cases over time, not a one-shot count) |
+| **Gas** | Estimates within ~20% of measured for primary flows |
+| **Beta demand** | Cohort engaged for structured testnet / staging feedback |
+| **Team health** | Sustainable pace and resourcing (avoid shipping from burnout) |
+| **Legal** | Jurisdiction-appropriate review before broad retail exposure |
+
+---
+
+## Document control
+
+| | |
+|:---|:---|
+| **Version** | 1.0 |
+| **Last updated** | 2026-05-06 |
+| **Status** | Living — update when new failure modes or mitigations are identified |

@@ -1,6 +1,11 @@
 # Timeline & Development Checklist
 
-## Phase 1 Timeline (12 weeks)
+**Audience:** Maintainers and core contributors · **Version:** 1.0 · **Status:** Planning checklist — dates are indicative  
+**See also:** [README](README.md) · [MVP specification](MVP_SPECIFICATION.md) · [Risk analysis](RISK_ANALYSIS.md) · [Contributing](CONTRIBUTING.md)
+
+---
+
+## Phase 1 timeline (~12 weeks)
 
 Week 1-2 — Foundation & Contracts
 - [ ] Finalize intent data model and ERC-7683 compatibility
@@ -30,10 +35,10 @@ Week 8 — Integration & Tests
 - [ ] Load testing for matching engine (100 concurrent intents)
 - [ ] Gas benchmarking and optimization
 
-Week 9 — Audit & Hardening
-- [ ] Internal code audit and security checklist
-- [ ] Fix issues found in tests and audits
-- [ ] Prepare audit artifacts for external firm
+Week 9 — Hardening (budget-conscious)
+- [ ] Internal code review, Slither runs, Foundry fuzzing, and security checklist
+- [ ] Fix issues found in tests and tooling
+- [ ] Package artifacts for a future external audit when budget and launch scope warrant it
 
 Week 10 — Testnet Deployment
 - [ ] Deploy contracts to Sepolia / Base testnet equivalents
@@ -75,7 +80,7 @@ Frontend
 
 Security & Reliability
 - [ ] Unit & integration test coverage >= 90%
-- [ ] External audit completed with no critical findings
+- [ ] Internal security review complete; external audit scheduled/budgeted before high-limit mainnet exposure
 - [ ] Monitoring/alerts for LayerZero and settlement failures
 - [ ] Insurance/fallback plan configured
 
@@ -94,5 +99,10 @@ Operations
 
 ---
 
-**Document Version:** 1.0
-**Last Updated:** 2026-05-06
+## Document control
+
+| | |
+|:---|:---|
+| **Version** | 1.0 |
+| **Last updated** | 2026-05-06 |
+| **Status** | Checklist — tick items as completed; adjust scope with MVP spec |

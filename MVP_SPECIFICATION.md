@@ -1,10 +1,15 @@
-# Intent Protocol Layer - MVP Specification
+# Intent Protocol Layer — MVP Specification
+
+**Audience:** Core contributors, auditors, product · **Version:** 1.0 · **Status:** Active — specification guides implementation (repo contains dev skeletons, not production-ready protocol code)  
+**See also:** [README](README.md) · [Architecture](ARCHITECTURE.md) · [Technology stack](TECH_STACK.md) · [Timeline](TIMELINE_CHECKLIST.md) · [Contributing](CONTRIBUTING.md)
+
+---
 
 ## Phase 1: Ethereum ↔ Base Simple Intent Matching
 
-**Duration:** 8-12 weeks  
-**Status:** Not started  
-**Target Launch:** Q3 2026
+**Duration:** 8–12 weeks (indicative)  
+**Implementation status:** Scaffolding in repository — on-chain settlement, messaging, and auction logic **not** feature-complete  
+**Target launch (documented):** Q3 2026
 
 ---
 
@@ -16,7 +21,7 @@ Enable users to swap tokens across Ethereum and Base chains using simple intent 
 
 ## Scope Definition
 
-### In Scope ✅
+### In Scope
 
 **Smart Contracts:**
 1. IntentSettler.sol (Ethereum)
@@ -50,7 +55,7 @@ Enable users to swap tokens across Ethereum and Base chains using simple intent 
 3. Testnet deployment
 4. Mainnet staging
 
-### Out of Scope ❌
+### Out of Scope
 
 - Solana support (Phase 2)
 - Encrypted intents (Phase 2)
@@ -105,10 +110,10 @@ IntentSettler.submitIntent({
 ```
 
 **Definition of Done:**
-- ✅ Smart contract function works on testnet
-- ✅ Gas estimation accurate within 5%
-- ✅ Events properly indexed
-- ✅ User can see intent in UI after submission
+- Smart contract function works on testnet
+- Gas estimation accurate within 5%
+- Events properly indexed
+- User can see intent in UI after submission
 
 ### Feature 2: Intent Matching (P2P)
 
@@ -162,10 +167,10 @@ def find_match(intent_a):
 ```
 
 **Definition of Done:**
-- ✅ Matching engine returns correct matches 100% of time
-- ✅ No invalid matches (violating price constraints)
-- ✅ Matching latency <5 seconds
-- ✅ Tested with 100+ intent pairs
+- Matching engine returns correct matches 100% of time
+- No invalid matches (violating price constraints)
+- Matching latency <5 seconds
+- Tested with 100+ intent pairs
 
 ### Feature 3: Solver Auction (Fallback)
 
@@ -208,10 +213,10 @@ t=120-180s: Cross-chain settlement completes
 ```
 
 **Definition of Done:**
-- ✅ Solver auction mechanism works on testnet
-- ✅ Multiple solvers can submit proposals
-- ✅ Best proposal always selected
-- ✅ Winning solver execution succeeds
+- Solver auction mechanism works on testnet
+- Multiple solvers can submit proposals
+- Best proposal always selected
+- Winning solver execution succeeds
 
 ### Feature 4: Cross-Chain Settlement (LayerZero)
 
@@ -284,10 +289,10 @@ function _lzReceiveConfirm() {
 ```
 
 **Definition of Done:**
-- ✅ Cross-chain message delivery reliable
-- ✅ Atomicity: both chains settle or both refund
-- ✅ Timeout works correctly
-- ✅ No stuck funds or partial settlements
+- Cross-chain message delivery reliable
+- Atomicity: both chains settle or both refund
+- Timeout works correctly
+- No stuck funds or partial settlements
 
 ### Feature 5: Web UI & User Experience
 
@@ -325,11 +330,11 @@ function _lzReceiveConfirm() {
 - Animation on successful settlement
 
 **Definition of Done:**
-- ✅ All pages functional
-- ✅ Works on MetaMask (desktop + mobile)
-- ✅ Responsive design (mobile, tablet, desktop)
-- ✅ No console errors
-- ✅ UX tested with 5+ users
+- All pages functional
+- Works on MetaMask (desktop + mobile)
+- Responsive design (mobile, tablet, desktop)
+- No console errors
+- UX tested with 5+ users
 
 ### Feature 6: Intent Cancellation
 
@@ -348,9 +353,9 @@ So I can get my tokens back
 - [ ] Gas cost for cancellation is reasonable (<50k)
 
 **Definition of Done:**
-- ✅ Cancellation works on testnet
-- ✅ Only valid intents can be cancelled
-- ✅ Refund is accurate
+- Cancellation works on testnet
+- Only valid intents can be cancelled
+- Refund is accurate
 
 ---
 
@@ -569,9 +574,9 @@ Test 4: Partial Match (Price Mismatch)
 ## Dependencies & Blockers
 
 **Hard Dependencies:**
-- LayerZero V2 deployed on Base ✅ (already live)
-- USDC on Base ✅ (already live)
-- ETH bridge to Base ✅ (already live)
+- LayerZero V2 deployed on Base (already live)
+- USDC on Base (already live)
+- ETH bridge to Base (already live)
 
 **External Factors:**
 - Base network stability (assumed 99.9%)
@@ -597,8 +602,11 @@ Week 12:     Full public launch
 
 ---
 
-## Document Version
+## Document control
 
-**MVP Spec Version:** 1.0  
-**Last Updated:** 2026-05-06  
-**Status:** Ready for development kickoff
+| | |
+|:---|:---|
+| **Version** | 1.0 |
+| **Last updated** | 2026-05-06 |
+| **Status** | Baseline MVP scope — update acceptance criteria as implementation lands |
+| **Owner** | Maintainers (see [README](README.md)) |

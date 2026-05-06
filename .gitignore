@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build / cache
+.next/
+out/
+dist/
+build/
+cache/
+coverage/
+.turbo/
+
+# Foundry
+contracts/cache/
+contracts/out/
+contracts/broadcast/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE / OS
+.DS_Store
+.idea/
+*.swp
+.vscode/*
+!.vscode/extensions.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# TypeScript
+*.tsbuildinfo

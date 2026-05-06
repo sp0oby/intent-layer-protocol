@@ -1,4 +1,9 @@
-# Intent Protocol Layer - Whitepaper
+# Intent Protocol Layer — Whitepaper
+
+**Audience:** Partners, contributors, investors · **Version:** 1.0 · **Status:** Living document (evolves with research and implementation)  
+**See also:** [README](README.md) · [Architecture](ARCHITECTURE.md) · [MVP specification](MVP_SPECIFICATION.md) · [Contributing](CONTRIBUTING.md)
+
+---
 
 ## Executive Summary
 
@@ -81,15 +86,15 @@ A **three-tier system** combining:
 
 ### Key Differentiators
 
-✅ **Intent-to-Intent Matching:** First protocol to enable direct P2P cross-chain swaps (like CoW Protocol but across chains)
+**Intent-to-Intent Matching:** First protocol to enable direct P2P cross-chain swaps (like CoW Protocol but across chains)
 
-✅ **Dead-Simple UX:** One-page interface, no bridge selection needed
+**Dead-Simple UX:** One-page interface, no bridge selection needed
 
-✅ **Better Pricing:** Direct matching eliminates DEX slippage
+**Better Pricing:** Direct matching eliminates DEX slippage
 
-✅ **Decentralized Solvers:** Easy solver SDK allows anyone to participate
+**Decentralized Solvers:** Easy solver SDK allows anyone to participate
 
-✅ **MEV Transparency:** Clear incentive structures, no hidden extraction
+**MEV Transparency:** Clear incentive structures, no hidden extraction
 
 ---
 
@@ -250,12 +255,12 @@ A **three-tier system** combining:
 
 | Feature | Intent Protocol Layer | UniswapX | CoW Protocol | Across | LiFi |
 |---------|----------------------|----------|--------------|--------|------|
-| Cross-Chain P2P Matching | ✅ Yes | ❌ No | ❌ Single-chain | ❌ No | ❌ No |
-| Simple UX | ✅ Yes | ⚠️ Good | ⚠️ Good | ⚠️ Okay | ⚠️ Okay |
-| Decentralized Solvers | ✅ Yes (easy SDK) | ✅ Yes | ✅ Yes | ❌ Limited | ❌ No |
-| Intent Chaining | ✅ Planned | ❌ No | ❌ No | ❌ No | ❌ No |
-| Privacy Layer | ✅ Planned | ❌ No | ❌ No | ❌ No | ❌ No |
-| ERC-7683 Compatible | ✅ Yes | ✅ Yes | ✅ Yes | ⚠️ Partial | ❌ No |
+| Cross-Chain P2P Matching | Yes | No | Single-chain | No | No |
+| Simple UX | Yes | Good | Good | Okay | Okay |
+| Decentralized Solvers | Yes (easy SDK) | Yes | Yes | Limited | No |
+| Intent Chaining | Planned | No | No | No | No |
+| Privacy Layer | Planned | No | No | No | No |
+| ERC-7683 Compatible | Yes | Yes | Yes | Partial | No |
 
 ---
 
@@ -305,6 +310,13 @@ Intent Protocol Layer addresses a critical gap in cross-chain infrastructure by 
 
 ---
 
-**Document Version:** 1.0  
-**Last Updated:** 2026-05-06  
-**Status:** Living document - subject to change based on research
+---
+
+## Document control
+
+| | |
+|:---|:---|
+| **Version** | 1.0 |
+| **Last updated** | 2026-05-06 |
+| **Status** | Living document — revisions track product and market learning |
+| **Feedback** | Open an issue or PR against this file for factual or strategic corrections |

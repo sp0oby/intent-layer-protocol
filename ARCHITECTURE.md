@@ -1,4 +1,9 @@
-# Intent Protocol Layer - Technical Architecture
+# Intent Protocol Layer — Technical Architecture
+
+**Audience:** Protocol engineers, security reviewers, senior contributors · **Version:** 1.0 · **Status:** Design baseline for Phase 1 MVP  
+**See also:** [README](README.md) · [MVP specification](MVP_SPECIFICATION.md) · [Technology stack](TECH_STACK.md) · [Contributing](CONTRIBUTING.md)
+
+---
 
 ## Overview
 
@@ -86,7 +91,7 @@ Display:
 │  Finds opposite intents (P2P)    │
 │  Intent A: 1 ETH → USDC          │
 │  Intent B: 2400 USDC → ETH       │
-│  MATCH! ✓                        │
+│  MATCH! (ok)                     │
 └──────────────┬───────────────────┘
                │
       ┌────────┴────────┐
@@ -503,6 +508,10 @@ MetaMask - Wallet integration
 
 ---
 
-**Architecture Version:** 1.0  
-**Last Updated:** 2026-05-06  
-**Status:** Ready for Phase 1 implementation
+## Document control
+
+| | |
+|:---|:---|
+| **Version** | 1.0 |
+| **Last updated** | 2026-05-06 |
+| **Status** | Baseline architecture — open PRs for material design changes with MVP spec alignment |

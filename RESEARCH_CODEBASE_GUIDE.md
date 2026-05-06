@@ -1,6 +1,11 @@
 # Research Codebase Analysis Guide
 
-This document guides you through understanding existing intent-based and cross-chain protocols to inform your design decisions.
+**Audience:** Contributors ramping on intent protocols · **Version:** 1.0 · **Status:** Recommended reading list — not exhaustive  
+**See also:** [README](README.md) · [Architecture](ARCHITECTURE.md) · [MVP specification](MVP_SPECIFICATION.md) · [Contributing](CONTRIBUTING.md)
+
+---
+
+This document guides you through understanding existing intent-based and cross-chain protocols to inform design decisions for Intent Protocol Layer.
 
 ---
 
@@ -246,39 +251,39 @@ Across proves that relayer-based intent settlement can work. Their economic mode
 
 | Aspect | CoW | UniswapX | LayerZero | Across | Router |
 |--------|-----|----------|-----------|--------|--------|
-| **Intent Matching** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | N/A | ⭐⭐⭐ | ⭐⭐ |
-| **Cross-Chain** | ❌ | ❌ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ |
-| **Solver Economics** | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | N/A | ⭐⭐⭐⭐ | ⭐⭐ |
-| **Code Clarity** | ⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐ |
-| **Scalability** | ⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐ |
+| **Intent Matching** | 5/5 | 4/5 | N/A | 3/5 | 2/5 |
+| **Cross-Chain** | No | No | 5/5 | 4/5 | 3/5 |
+| **Solver Economics** | 4/5 | 4/5 | N/A | 4/5 | 2/5 |
+| **Code Clarity** | 3/5 | 4/5 | 5/5 | 2/5 | 3/5 |
+| **Scalability** | 3/5 | 3/5 | 4/5 | 4/5 | 2/5 |
 
 ---
 
 ## Your Design Decisions (Based on Research)
 
 ### Decision 1: Follow ERC-7683 Standard
-- ✅ Benefit: Compatible with UniswapX, others
-- ✅ Benefit: Clearer intent definition
+- Benefit: Compatible with UniswapX, others
+- Benefit: Clearer intent definition
 - Use UniswapX as reference for encoding
 
 ### Decision 2: Use LayerZero for Cross-Chain
-- ✅ Faster settlement (good UX)
-- ✅ Lower fees
-- ⚠️ Risk: If LayerZero fails, have CCIP fallback
+- Faster settlement (good UX)
+- Lower fees
+- Risk: If LayerZero fails, have CCIP fallback
 
 ### Decision 3: Solver Auction from CoW Protocol
-- ✅ Proven model
-- ✅ Competitive pricing
-- ✅ Decentralized
+- Proven model
+- Competitive pricing
+- Decentralized
 - Copy CoW's fee mechanism
 
 ### Decision 4: P2P Matching (Custom)
-- ❌ No existing protocol does cross-chain P2P matching
+- No existing protocol does cross-chain P2P matching
 - Your innovation: Design matching engine from scratch
 - Reference: CoW's batch auction logic
 
 ### Decision 5: Across-style Timeout & Refund
-- ✅ Proven failure recovery
+- Proven failure recovery
 - User can refund if settlement takes too long
 - Implement 5-minute timeout
 
@@ -349,6 +354,10 @@ As you read each codebase, answer:
 
 ---
 
-**Research Guide Version:** 1.0  
-**Last Updated:** 2026-05-06  
-**Status:** Ready to start deep dive
+## Document control
+
+| | |
+|:---|:---|
+| **Version** | 1.0 |
+| **Last updated** | 2026-05-06 |
+| **Status** | Maintained reading list — add PRs to capture new reference implementations |
