@@ -2,9 +2,9 @@
 
 **Stack:** Next.js 14 (App Router), TypeScript, Tailwind CSS, **wagmi** + **viem**, **TanStack Query**, **Zustand**, **Framer Motion**, shadcn-style UI primitives (e.g. [`components/ui/button.tsx`](components/ui/button.tsx)).
 
-**Role in the repo:** Web client for creating and tracking cross-chain intents. Today it uses a **mock API** and stub forms; wire it to deployed contracts and the real backend per the [MVP specification](../MVP_SPECIFICATION.md).
+**Role in the repo:** Web client for creating and tracking cross-chain intents. Today it uses a **mock API** and stub forms; wire it to deployed contracts and the real backend per the [MVP specification](../docs/MVP_SPECIFICATION.md).
 
-**See also:** [Repository README](../README.md) · [Contributing](../CONTRIBUTING.md) · [Technology stack](../TECH_STACK.md)
+**See also:** [Repository README](../README.md) · [Contributing](../CONTRIBUTING.md) · [Technology stack](../docs/TECH_STACK.md)
 
 ---
 

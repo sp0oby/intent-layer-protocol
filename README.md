@@ -16,6 +16,7 @@ This repository contains the **protocol specification**, a **working dev skeleto
 - [Why this project](#why-this-project)
 - [Current status](#current-status)
 - [Repository layout](#repository-layout)
+- [Documentation](#documentation)
 - [Quickstart](#quickstart)
 - [Scripts & quality gates](#scripts--quality-gates)
 - [Project board and issues (maintainers)](#project-board-and-issues-maintainers)
@@ -30,7 +31,7 @@ This repository contains the **protocol specification**, a **working dev skeleto
 
 Bridge UIs today force users to pick routes, absorb stacked slippage, and reason about fragmented liquidity. Intent Layer aims for **one-step intent expression** and **better pricing** when two opposite intents can be matched directly across chains — with a **transparent solver fallback** when they cannot.
 
-**Primary transport (Phase 1):** LayerZero V2. **Optional fallback path:** Chainlink CCIP (design-time; see [ARCHITECTURE.md](ARCHITECTURE.md)).
+**Primary transport (Phase 1):** LayerZero V2. **Optional fallback path:** Chainlink CCIP (design-time; see [Architecture](docs/ARCHITECTURE.md)).
 
 ---
 
@@ -38,7 +39,7 @@ Bridge UIs today force users to pick routes, absorb stacked slippage, and reason
 
 | Area | State |
 |------|--------|
-| **Specification** | Whitepaper, architecture, MVP spec, risk, tech stack, research guide — [tracked in root `.md` files](#repository-layout) |
+| **Specification** | Protocol design and planning docs live under [`docs/`](#documentation) |
 | **Smart contracts** | **Scaffolding only** — `IntentSettler` and `SolverAuction` compile and are covered by starter tests; **escrow, LayerZero, and production invariants are not implemented yet** |
 | **Backend** | Express API skeleton, in-memory matcher + DB schema stub, indexer placeholder |
 | **Frontend** | Next.js app with wallet connect (wagmi), swap + intent status flows wired to a **mock API** |
@@ -55,10 +56,25 @@ Treat on-chain code as **templates to extend**, not audited production assets.
 | [`contracts/`](contracts/) | Foundry project — protocol Solidity **stubs** + [`lib/forge-std`](contracts/lib/forge-std) (test library, vendored). See [`contracts/README.md`](contracts/README.md). |
 | [`backend/`](backend/) | TypeScript API, matcher stub, migrations — [`backend/README.md`](backend/README.md) |
 | [`frontend/`](frontend/) | Next.js App Router client — [`frontend/README.md`](frontend/README.md) |
-| [`docs/`](docs/) | Maintainer notes (e.g. GitHub Project / issue templates) |
+| [`docs/`](docs/) | [Protocol documentation](#documentation) (whitepaper, architecture, MVP, risk, stack, research, timeline) and maintainer guides (GitHub Projects / issues) |
 | [`docker-compose.yml`](docker-compose.yml) | Local Postgres, Redis, Anvil |
 | [`.env.example`](.env.example) | Non-secret configuration template |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | How to contribute — branches, PR expectations, review norms |
+
+---
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Whitepaper](docs/WHITEPAPER.md) | Vision, market, roadmap |
+| [Architecture](docs/ARCHITECTURE.md) | Technical design and layering |
+| [MVP specification](docs/MVP_SPECIFICATION.md) | Phase 1 scope and acceptance criteria |
+| [Risk analysis](docs/RISK_ANALYSIS.md) | Risks and mitigations |
+| [Technology stack](docs/TECH_STACK.md) | Tools, frameworks, infra |
+| [Research guide](docs/RESEARCH_CODEBASE_GUIDE.md) | Reference protocols and reading plan |
+| [Timeline and checklist](docs/TIMELINE_CHECKLIST.md) | Milestones and checklists |
+| [GitHub Projects and issues](docs/GITHUB_PROJECT_AND_ISSUES.md) | Board setup and issue templates |
 
 ---
 
@@ -132,7 +148,7 @@ We welcome issues and PRs. Read [**CONTRIBUTING.md**](CONTRIBUTING.md) for branc
 This codebase is **early-stage**. **Do not** assume safety for real funds.
 
 - Use internal review, **Slither**, and **Foundry fuzzing** during development.
-- Schedule **external audits** before high-limit or broad mainnet exposure when budget allows ([`RISK_ANALYSIS.md`](RISK_ANALYSIS.md)).
+- Schedule **external audits** before high-limit or broad mainnet exposure when budget allows ([Risk analysis](docs/RISK_ANALYSIS.md)).
 - Report suspected vulnerabilities responsibly (process TBD; open a private security advisory on GitHub if enabled).
 
 ---

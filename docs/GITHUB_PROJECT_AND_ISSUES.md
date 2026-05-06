@@ -1,7 +1,7 @@
 # GitHub — Project board & issue templates
 
 **Audience:** Maintainers · **Purpose:** Operational guide for backlog hygiene (not protocol design)  
-**See also:** [README](README.md) · [Contributing](CONTRIBUTING.md)
+**See also:** [README](../README.md) · [Contributing](../CONTRIBUTING.md)
 
 **Automated option:** from the repo root, run `./scripts/bootstrap-github-project-and-issues.sh` (after `gh auth login` and `gh auth refresh -s project`) to create the project, link it to this repository, and open the issues below.
 

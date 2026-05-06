@@ -2,7 +2,7 @@
 
 **What this is:** the **on-chain skeleton** for Phase 1 — compile-ready Solidity, interfaces, libraries, and starter tests. It is **not** a complete or audited protocol (no production escrow, LayerZero paths, or auction finality yet).
 
-**See also:** [Repository README](../README.md) · [Contributing](../CONTRIBUTING.md) · [Architecture](../ARCHITECTURE.md) · [MVP specification](../MVP_SPECIFICATION.md)
+**See also:** [Repository README](../README.md) · [Contributing](../CONTRIBUTING.md) · [Architecture](../docs/ARCHITECTURE.md) · [MVP specification](../docs/MVP_SPECIFICATION.md)
 
 ---
 
@@ -42,4 +42,4 @@ forge test
 - **`SolverAuction`** — shape for solver proposals; ranking and execution **TODO**.
 - **Libraries** — hashing and transfer/signature helpers to be hardened (e.g. OpenZeppelin, EIP-712) before mainnet.
 
-Pull requests that change state machines or token flows should cite [`MVP_SPECIFICATION.md`](../MVP_SPECIFICATION.md) and extend tests accordingly.
+Pull requests that change state machines or token flows should cite [`docs/MVP_SPECIFICATION.md`](../docs/MVP_SPECIFICATION.md) and extend tests accordingly.

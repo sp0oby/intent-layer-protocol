@@ -1,7 +1,7 @@
 # Intent Protocol Layer — Whitepaper
 
 **Audience:** Partners, contributors, investors · **Version:** 1.0 · **Status:** Living document (evolves with research and implementation)  
-**See also:** [README](README.md) · [Architecture](ARCHITECTURE.md) · [MVP specification](MVP_SPECIFICATION.md) · [Contributing](CONTRIBUTING.md)
+**See also:** [README](../README.md) · [Architecture](ARCHITECTURE.md) · [MVP specification](MVP_SPECIFICATION.md) · [Contributing](../CONTRIBUTING.md)
 
 ---
 

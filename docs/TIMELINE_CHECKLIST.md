@@ -1,7 +1,7 @@
 # Timeline & Development Checklist
 
 **Audience:** Maintainers and core contributors · **Version:** 1.0 · **Status:** Planning checklist — dates are indicative  
-**See also:** [README](README.md) · [MVP specification](MVP_SPECIFICATION.md) · [Risk analysis](RISK_ANALYSIS.md) · [Contributing](CONTRIBUTING.md)
+**See also:** [README](../README.md) · [MVP specification](MVP_SPECIFICATION.md) · [Risk analysis](RISK_ANALYSIS.md) · [Contributing](../CONTRIBUTING.md)
 
 ---
 

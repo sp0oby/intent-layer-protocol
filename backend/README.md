@@ -4,7 +4,7 @@
 
 **Role in the repo:** Off-chain services — REST API for solvers/frontends, **in-memory matching stub**, **indexer placeholder** for `IntentSubmitted`-style events, and SQL migrations for the order-book schema.
 
-**See also:** [Repository README](../README.md) · [Contributing](../CONTRIBUTING.md) · [Architecture](../ARCHITECTURE.md) · [Technology stack](../TECH_STACK.md)
+**See also:** [Repository README](../README.md) · [Contributing](../CONTRIBUTING.md) · [Architecture](../docs/ARCHITECTURE.md) · [Technology stack](../docs/TECH_STACK.md)
 
 ---
 

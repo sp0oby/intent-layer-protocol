@@ -6,7 +6,7 @@ Thank you for helping build cross-chain intent infrastructure. This document exp
 
 ## Principles
 
-- **Spec-driven:** Significant behavior changes should align with [`MVP_SPECIFICATION.md`](MVP_SPECIFICATION.md) and [`ARCHITECTURE.md`](ARCHITECTURE.md), or the docs should be updated in the same PR.
+- **Spec-driven:** Significant behavior changes should align with the [MVP specification](docs/MVP_SPECIFICATION.md) and [Architecture](docs/ARCHITECTURE.md), or the docs should be updated in the same PR.
 - **Small, reviewable PRs:** Prefer focused changes over large refactors unless agreed in an issue first.
 - **Tests required:** Contract changes must keep `forge test` green; backend and frontend changes should preserve existing tests and add coverage for new logic.
 - **No secrets:** Never commit private keys, RPC API keys, or `.env` files. Use [`.env.example`](.env.example) only.

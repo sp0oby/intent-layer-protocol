@@ -1,7 +1,7 @@
 # Intent Protocol Layer — Technical Architecture
 
 **Audience:** Protocol engineers, security reviewers, senior contributors · **Version:** 1.0 · **Status:** Design baseline for Phase 1 MVP  
-**See also:** [README](README.md) · [MVP specification](MVP_SPECIFICATION.md) · [Technology stack](TECH_STACK.md) · [Contributing](CONTRIBUTING.md)
+**See also:** [README](../README.md) · [MVP specification](MVP_SPECIFICATION.md) · [Technology stack](TECH_STACK.md) · [Contributing](../CONTRIBUTING.md)
 
 ---
 

@@ -1,7 +1,7 @@
 # Research Codebase Analysis Guide
 
 **Audience:** Contributors ramping on intent protocols · **Version:** 1.0 · **Status:** Recommended reading list — not exhaustive  
-**See also:** [README](README.md) · [Architecture](ARCHITECTURE.md) · [MVP specification](MVP_SPECIFICATION.md) · [Contributing](CONTRIBUTING.md)
+**See also:** [README](../README.md) · [Architecture](ARCHITECTURE.md) · [MVP specification](MVP_SPECIFICATION.md) · [Contributing](../CONTRIBUTING.md)
 
 ---
 

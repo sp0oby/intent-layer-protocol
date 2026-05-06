@@ -1,7 +1,7 @@
 # Intent Protocol Layer — MVP Specification
 
 **Audience:** Core contributors, auditors, product · **Version:** 1.0 · **Status:** Active — specification guides implementation (repo contains dev skeletons, not production-ready protocol code)  
-**See also:** [README](README.md) · [Architecture](ARCHITECTURE.md) · [Technology stack](TECH_STACK.md) · [Timeline](TIMELINE_CHECKLIST.md) · [Contributing](CONTRIBUTING.md)
+**See also:** [README](../README.md) · [Architecture](ARCHITECTURE.md) · [Technology stack](TECH_STACK.md) · [Timeline](TIMELINE_CHECKLIST.md) · [Contributing](../CONTRIBUTING.md)
 
 ---
 
@@ -609,4 +609,4 @@ Week 12:     Full public launch
 | **Version** | 1.0 |
 | **Last updated** | 2026-05-06 |
 | **Status** | Baseline MVP scope — update acceptance criteria as implementation lands |
-| **Owner** | Maintainers (see [README](README.md)) |
+| **Owner** | Maintainers (see [README](../README.md)) |

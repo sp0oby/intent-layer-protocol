@@ -87,10 +87,10 @@ else
   issue "W1-09: CI workflow" $'## Scope\n- PR workflow: forge test, backend lint/test, frontend lint/build\n\n## Acceptance\n- CI green on main' "platform,week-1"
 
   # --- Weeks 2-4 (high level) ---
-  issue "W2-01: LayerZero OApp wiring (stub)" "Add message encode/decode stubs and interface alignment with ARCHITECTURE.md." "contracts,week-2"
+  issue "W2-01: LayerZero OApp wiring (stub)" "Add message encode/decode stubs and interface alignment with docs/ARCHITECTURE.md." "contracts,week-2"
   issue "W2-02: Indexer to Postgres persistence" "Persist indexed intents; idempotent upserts." "backend,week-2"
   issue "W2-03: Contract deployment scripts" "forge script for local + testnet placeholders." "contracts,week-2"
-  issue "W3-01: Solver auction flow" "Expand SolverAuction + API per MVP_SPECIFICATION.md." "contracts,backend,week-3"
+  issue "W3-01: Solver auction flow" "Expand SolverAuction + API per docs/MVP_SPECIFICATION.md." "contracts,backend,week-3"
   issue "W3-02: Reference solver bot (optional)" "Minimal bot or CLI posting proposals to API." "backend,week-3"
   issue "W4-01: E2E smoke: submit to index to UI" "Documented path: anvil + API + UI." "platform,week-4"
   issue "W4-02: Gas snapshots + coverage baseline" "forge snapshot + document targets." "contracts,week-4"
