@@ -1,4 +1,4 @@
-# Intent Protocol Layer — MVP Specification
+# Intent Layer Protocol — MVP Specification
 
 **Audience:** Core contributors, auditors, product · **Version:** 1.0 · **Status:** Active — specification guides implementation (repo contains dev skeletons, not production-ready protocol code)  
 **See also:** [README](../README.md) · [Architecture](ARCHITECTURE.md) · [Technology stack](TECH_STACK.md) · [Timeline](TIMELINE_CHECKLIST.md) · [Contributing](../CONTRIBUTING.md)
@@ -24,10 +24,10 @@ Enable users to swap tokens across Ethereum and Base chains using simple intent 
 ### In Scope
 
 **Smart Contracts:**
-1. IntentSettler.sol (Ethereum)
-2. IntentSettler.sol (Base)
-3. SolverAuction.sol (simple auction mechanism)
-4. LayerZero OApp integration
+1. `IntentSettler.sol` (one deployment on Ethereum, one on Base — same logic; constructor takes optional `ChainPeerRegistry`)
+2. `ChainPeerRegistry.sol` (**one deployment per chain** — EID table + route allowlist; see [Architecture](ARCHITECTURE.md))
+3. `SolverAuction.sol` (simple auction mechanism)
+4. LayerZero OApp integration (`setPeer` per remote EID, in addition to registry EIDs)
 
 **Supported Assets:**
 - Ethereum: ETH, USDC, USDT (ERC-20)
@@ -236,7 +236,8 @@ So tokens move correctly on both chains
 - [ ] Ethereum confirms and releases tokens to Base user
 - [ ] Settlement completes within 5 minutes (finality)
 - [ ] If one chain fails, both refund after timeout
-- [ ] **Extensibility:** settlement paths use **configurable peers / endpoint IDs** (e.g. OApp `setPeer` + registry or storage), not hardcoded “Base-only” branches; `intent.sourceChainId` / `intent.destChainId` drive routing
+- [ ] **Extensibility:** settlement paths use **`ChainPeerRegistry`** + **OApp `setPeer`**, not hardcoded “Base-only” branches; `intent.sourceChainId` / `intent.destChainId` drive routing
+- [ ] **`ChainPeerRegistry`** deployed on Ethereum and Base with correct **LayerZero EIDs** and **`setRouteSupported`** for Phase 1 corridors; production `IntentSettler` uses non-zero registry address
 
 **Settlement States:**
 
@@ -251,7 +252,9 @@ MATCHED → LOCKED → SETTLED → CONFIRMED
 **Code Skeleton:**
 
 ```solidity
-// Phase 1: Lock on Ethereum
+// IChainPeerRegistry registry — per-chain deployment; use registry.lzEidForChain(...) for _lzSend
+
+// Phase 1: Lock on source chain
 function executeMatching(bytes32 ethIntentHash, bytes32 baseIntentHash) {
     // Lock ETH on Ethereum
     Intent memory ethIntent = intents[ethIntentHash];

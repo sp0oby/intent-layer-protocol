@@ -47,7 +47,7 @@ See the [README](README.md) **Quickstart**. Minimum checklist:
 
 | Area | Path | Notes |
 |------|------|--------|
-| On-chain | [`contracts/src/`](contracts/src/) | Production logic; keep interfaces in [`contracts/src/interfaces/`](contracts/src/interfaces/) |
+| On-chain | [`contracts/src/`](contracts/src/) | Production logic; interfaces under [`contracts/src/interfaces/`](contracts/src/interfaces/) · **`ChainPeerRegistry.sol`** for multi-chain EID + route config |
 | Contract tests | [`contracts/test/`](contracts/test/) | Foundry; extend coverage for new flows |
 | Backend | [`backend/src/`](backend/src/) | API, indexer, matching; SQL under [`backend/database/`](backend/database/) |
 | Frontend | [`frontend/app/`](frontend/app/) | Routes and API routes; shared UI under [`frontend/components/`](frontend/components/) |

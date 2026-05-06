@@ -201,6 +201,12 @@ Winner: Solver A (best price for user)
 
 ### Smart Contracts Overview
 
+#### ChainPeerRegistry.sol (deploy on **each** chain)
+
+- **Role:** On-chain **routing config** — maps canonical `chainId` → LayerZero V2 **endpoint id** (`lzEidForChain`) and gates which **`(sourceChainId → destChainId)`** corridors are enabled (`isRouteSupported`). Same bytecode on every chain; **config differs per deployment**.
+- **Pairs with:** `IntentSettler` constructor address; LayerZero **OApp `setPeer`** for remote contract addresses. Registry does **not** replace `setPeer`; it replaces **hardcoded EIDs** and gives a **single place** to widen or narrow routes.
+- **Source:** [`contracts/src/ChainPeerRegistry.sol`](../contracts/src/ChainPeerRegistry.sol), [`IChainPeerRegistry.sol`](../contracts/src/interfaces/IChainPeerRegistry.sol).
+
 #### 1. IntentSettler.sol (Ethereum)
 
 ```solidity
@@ -245,7 +251,7 @@ contract IntentSettler {
 - Escrow source tokens
 - Validate intent signatures
 - Execute matched intents
-- Send cross-chain messages to Base via LayerZero
+- Resolve LayerZero **destination EID** via **`ChainPeerRegistry.lzEidForChain(intent.destChainId)`** (not a hardcoded Base constant); send messages through LayerZero OApp
 
 #### 2. IntentSettler.sol (Base)
 
@@ -352,12 +358,17 @@ Phase 1 ships **Ethereum + Base**, but settlement should be **chain-agnostic** s
 3. **Validate the intent against this chain** — On `submitIntent`, require `intent.sourceChainId == block.chainid` (or equivalent) so users cannot replay intents meant for another origin.
 4. **Support matrix is explicit** — Maintain an **allowlist** (or tiered limits) for `(sourceChainId, destChainId, token…)` so you can enable routes gradually and tune risk per corridor.
 5. **Version cross-chain payloads** — Prefix `abi.encode` payloads with a **`uint8 messageVersion`** (or use typed structured hashes) so you can evolve formats without breaking old peers; old peers ignore or reject unknown versions cleanly.
-6. **Governance or admin for topology changes** — Whoever controls `setPeer` / allowlist updates should be **multisig / timelock / governance** in production, not an EOA.
+6. **Governance or admin for topology changes** — Whoever controls `setPeer` and **`ChainPeerRegistry`** (`setLzEidForChain`, `setRouteSupported`) should be **multisig / timelock / governance** in production, not an EOA.
+
+**On-chain building blocks (repository)**
+
+- [`ChainPeerRegistry.sol`](../contracts/src/ChainPeerRegistry.sol) — per-chain deployment: `chainId` → LayerZero **EID**, plus **`isRouteSupported(source, dest)`** for rollout control. [`IntentSettler`](../contracts/src/IntentSettler.sol) optionally references it in the constructor; production should pass a real registry.
 
 **What “add Arbitrum” looks like (target state)**
 
-- Deploy `IntentSettler` (OApp) on Arbitrum; wire LayerZero endpoint.
+- Deploy `ChainPeerRegistry` + `IntentSettler` (OApp) on Arbitrum; wire LayerZero endpoint.
 - On **Ethereum, Base, and Arbitrum**, call **`setPeer(arbitrumEid, arbitrumSettlerAddress)`** (and reciprocal peers) so every participant trusts the new remote.
+- On **each** existing `ChainPeerRegistry`, call **`setLzEidForChain(arbitrumChainId, arbitrumLzEid)`** and **`setRouteSupported`** for new corridors you want to expose.
 - Update **off-chain** config (indexer RPC, matcher supported pairs, UI chain list).
 - No redeploy on old chains **if** peers and routes were always **storage-driven**; you only redeploy if you need a **new bytecode** for unrelated reasons.
 

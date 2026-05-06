@@ -9,8 +9,9 @@
 
 Week 1-2 — Foundation & Contracts
 - [ ] Finalize intent data model and ERC-7683 compatibility
-- [ ] Implement IntentSettler.sol (Ethereum) core functions
-- [ ] Implement basic local tests (Foundry)
+- [ ] Deploy and configure **`ChainPeerRegistry`** on each devnet/testnet chain (EIDs + `setRouteSupported` for Phase 1 routes)
+- [ ] Implement `IntentSettler.sol` core functions (constructor-registry, `submitIntent` guards per [Architecture](ARCHITECTURE.md))
+- [ ] Implement basic local tests (Foundry), including registry + settler coverage
 - [ ] Set up repo structure, CI skeleton
 
 Week 3-4 — Cross-Chain & Matching

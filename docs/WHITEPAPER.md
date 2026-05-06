@@ -162,6 +162,9 @@ A **three-tier system** combining:
 
 ### Core Components
 
+**0. Chain registry (on each chain)**  
+Per-network [`ChainPeerRegistry`](../contracts/src/ChainPeerRegistry.sol): LayerZero **endpoint id** per `chainId` and **`isRouteSupported`** for gradual multi-chain rollout. Works with (does not replace) LayerZero **`setPeer`**.
+
 **1. Intent Settlement Contract** (Ethereum)
 - Receives intents from users
 - Escrows tokens

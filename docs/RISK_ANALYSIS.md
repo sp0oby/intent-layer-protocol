@@ -120,9 +120,10 @@ LayerZero is a third-party service. If it fails or is down:
 // If LayerZero message not confirmed in 5 minutes, user can refund
 mapping(bytes32 => uint256) public messageTimestamps;
 
-function sendCrossChainMessage(bytes32 intentHash) internal {
+function sendCrossChainMessage(bytes32 intentHash, uint256 destChainId) internal {
     messageTimestamps[intentHash] = block.timestamp;
-    _lzSend(DEST_EID_BASE, payload, options);
+    uint32 dstEid = registry.lzEidForChain(destChainId);
+    _lzSend(dstEid, payload, options);
 }
 
 function refundIfTimeout(bytes32 intentHash) external {
@@ -130,6 +131,35 @@ function refundIfTimeout(bytes32 intentHash) external {
     refund(intentHash);
 }
 ```
+
+---
+
+### Risk 2B: Chain topology & `ChainPeerRegistry` misconfiguration
+
+**Severity:** HIGH (operational)  
+**Probability:** Medium on fast iteration; Low with multisig + checklists  
+**Impact:** Stuck messages, unintended route enablement, or settlement to the wrong remote chain
+
+**Description:**
+
+Adding chains relies on **correct LayerZero endpoint ids (EIDs)**, **OApp `setPeer`**, and **`ChainPeerRegistry` route allowlists** on **each** chain deployment. A wrong EID, stale peer, or overly broad `isRouteSupported` mapping can brick messaging or expose a new corridor before it is audited.
+
+**Mitigation Strategy:**
+
+1. **Treat registry + peer updates like production releases**
+   - [ ] Documented runbook: new chain = deploy `ChainPeerRegistry` + `IntentSettler`, set EIDs/routes, then `setPeer` on all existing settlers.
+   - [ ] CI or script dry-run that compares configured EIDs against LayerZero’s published [deployed endpoints](https://docs.layerzero.network/) for the target network.
+
+2. **Remove EOAs from `owner` on mainnet**
+   - [ ] Transfer `ChainPeerRegistry` ownership to **multisig / timelock** before high limits.
+   - [ ] Optional: separate roles for “route toggle” vs “EID update” in a future revision.
+
+3. **Monitoring**
+   - [ ] Alerts when `LzEidSet` / `RouteSupportSet` / `OwnershipTransferred` fire on monitored chains.
+   - [ ] Dashboard: supported `(sourceChainId, destChainId)` mirrored from on-chain events.
+
+4. **`IntentSettler` wiring**
+   - [ ] Production deployments use **non-zero** `chainRegistry`; `address(0)` only for local dev/tests.
 
 ---
 

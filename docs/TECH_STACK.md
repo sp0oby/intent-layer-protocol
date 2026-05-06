@@ -52,20 +52,22 @@ alt: Hardhat (if Foundry has issues)
 
 ```
 contracts/
-├── IntentSettler.sol (main settlement logic)
+├── ChainPeerRegistry.sol (chainId → LZ endpoint id + route allowlist; one deployment per network)
+├── IntentSettler.sol (main settlement logic; optional registry in constructor)
 ├── SolverAuction.sol (fallback auction)
 ├── interfaces/
 │   ├── IIntentSettler.sol
-│   ├── ILayerZeroReceiver.sol
-│   └── IERC20.sol (for token interaction)
+│   ├── IChainPeerRegistry.sol
+│   └── (future: IERC20 or OZ imports as dependencies are added)
 ├── libraries/
 │   ├── IntentHash.sol (hashing logic)
 │   ├── SignatureValidator.sol (ECDSA)
 │   └── SafeTransfer.sol (token transfer safety)
 └── test/
-    ├── IntentSettler.t.sol (Foundry tests)
+    ├── ChainPeerRegistry.t.sol
+    ├── IntentSettler.t.sol
     ├── SolverAuction.t.sol
-    ├── CrossChain.t.sol (LayerZero tests)
+    ├── CrossChain.t.sol (LayerZero tests — future)
     └── Integration.t.sol (end-to-end)
 ```
 

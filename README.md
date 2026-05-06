@@ -41,7 +41,7 @@ Bridge UIs today force users to pick routes, absorb stacked slippage, and reason
 | Area | State |
 |------|--------|
 | **Specification** | Protocol design and planning docs live under [`docs/`](#documentation) |
-| **Smart contracts** | **Scaffolding only** — `IntentSettler` and `SolverAuction` compile and are covered by starter tests; **escrow, LayerZero, and production invariants are not implemented yet** |
+| **Smart contracts** | **Scaffolding** — `IntentSettler` (with optional `ChainPeerRegistry`), `ChainPeerRegistry`, `SolverAuction` compile; **escrow, LayerZero OApp send/receive, and production invariants are not implemented yet** |
 | **Backend** | Express API skeleton, in-memory matcher + DB schema stub, indexer placeholder |
 | **Frontend** | Next.js app with wallet connect (wagmi), swap + intent status flows wired to a **mock API** |
 | **CI** | GitHub Actions: Foundry + backend `tsc`/tests + frontend build ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) |
@@ -54,7 +54,7 @@ Treat on-chain code as **templates to extend**, not audited production assets.
 
 | Path | Purpose |
 |------|---------|
-| [`contracts/`](contracts/) | Foundry project — protocol Solidity **stubs** + [`lib/forge-std`](contracts/lib/forge-std) (test library, vendored). See [`contracts/README.md`](contracts/README.md). |
+| [`contracts/`](contracts/) | Foundry — **`ChainPeerRegistry`**, `IntentSettler`, `SolverAuction`, interfaces, libraries ([`contracts/README.md`](contracts/README.md)) |
 | [`backend/`](backend/) | TypeScript API, matcher stub, migrations — [`backend/README.md`](backend/README.md) |
 | [`frontend/`](frontend/) | Next.js App Router client — [`frontend/README.md`](frontend/README.md) |
 | [`docs/`](docs/) | [Protocol documentation](#documentation) (whitepaper, architecture, MVP, risk, stack, research, timeline) and maintainer guides (GitHub Projects / issues) |

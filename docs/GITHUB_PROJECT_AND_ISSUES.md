@@ -167,7 +167,7 @@ Labels: platform, week-1
 
 ### W2-01 — LayerZero OApp wiring (stub)
 
-Placeholder integration per ARCHITECTURE; message encode/decode stubs.
+Placeholder integration per ARCHITECTURE; message encode/decode stubs. **`_lzSend` must resolve dst EID via `ChainPeerRegistry.lzEidForChain`** (no hardcoded Base EID in production paths).
 
 ### W2-02 — Indexer → Postgres persistence
 

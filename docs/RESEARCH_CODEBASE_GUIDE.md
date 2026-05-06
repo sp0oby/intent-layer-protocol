@@ -270,6 +270,7 @@ Across proves that relayer-based intent settlement can work. Their economic mode
 - Faster settlement (good UX)
 - Lower fees
 - Risk: If LayerZero fails, have CCIP fallback
+- **Topology:** pair LayerZero OApp **`setPeer`** with on-chain [`ChainPeerRegistry`](../contracts/src/ChainPeerRegistry.sol) — **EID lookup** and **`isRouteSupported`** live in storage so new chains are **config + deploy**, not per-chain Solidity forks (see [Architecture](ARCHITECTURE.md)).
 
 ### Decision 3: Solver Auction from CoW Protocol
 - Proven model
@@ -299,7 +300,8 @@ Across proves that relayer-based intent settlement can work. Their economic mode
 **Week 2: Cross-Chain Mechanics**
 1. Read LayerZero `OApp.sol` (understand message passing)
 2. Read simple LayerZero example (e.g., OFT)
-3. Design your cross-chain message format
+3. Read this repo’s [`contracts/src/ChainPeerRegistry.sol`](../contracts/src/ChainPeerRegistry.sol) and [`IntentSettler.sol`](../contracts/src/IntentSettler.sol) (routing + `submitIntent` guards)
+4. Design your cross-chain message format (include `messageVersion` per [Architecture](ARCHITECTURE.md))
 
 **Week 3: Matching Engine**
 1. Read CoW `GPv2Settlement.settle()` (batch matching)

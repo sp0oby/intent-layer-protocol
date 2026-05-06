@@ -14,7 +14,7 @@ If your editor ever shows **`lib 2`**, **`src 2`**, **`test 2`**, or **`contract
 
 | Path | Role |
 |------|------|
-| [`src/`](src/) | Protocol contracts: [`IntentSettler.sol`](src/IntentSettler.sol), [`SolverAuction.sol`](src/SolverAuction.sol), [`interfaces/`](src/interfaces/), [`libraries/`](src/libraries/) |
+| [`src/`](src/) | [`ChainPeerRegistry.sol`](src/ChainPeerRegistry.sol), [`IntentSettler.sol`](src/IntentSettler.sol), [`SolverAuction.sol`](src/SolverAuction.sol), [`interfaces/`](src/interfaces/), [`libraries/`](src/libraries/) |
 | [`test/`](test/) | Your Foundry tests (`*.t.sol`) |
 | [`lib/forge-std/`](lib/forge-std/) | **Vendored** [forge-std](https://github.com/foundry-rs/forge-std) — *its* `src/` and `test/` are part of the dependency, **not** a second copy of your protocol |
 
@@ -38,7 +38,8 @@ forge test
 
 ## Design intent (high level)
 
-- **`IntentSettler`** — record intents, emit events; escrow and cross-chain messaging **TODO** per MVP spec. Design for **configurable peers / routes** when wiring LayerZero (see [`IChainPeerRegistry.sol`](src/interfaces/IChainPeerRegistry.sol) and [**Architecture**](../docs/ARCHITECTURE.md) — multi-chain extensibility).
+- **`ChainPeerRegistry`** — per-chain **LayerZero EID** table + **`isRouteSupported`**; owned by deployer until multisig/timelock. Paired with **`IntentSettler(chainRegistry)`** (use `address(0)` only in ephemeral tests).
+- **`IntentSettler`** — record intents; enforces **`sourceChainId == block.chainid`** and registry route when configured; escrow + **`lzEidForChain`** in **`_lzSend`** are **TODO** per MVP / Architecture.
 - **`SolverAuction`** — shape for solver proposals; ranking and execution **TODO**.
 - **Libraries** — hashing and transfer/signature helpers to be hardened (e.g. OpenZeppelin, EIP-712) before mainnet.
 

@@ -5,7 +5,7 @@ These files describe **Intent Layer Protocol** — vision, architecture, Phase 1
 | Document | Description |
 |----------|-------------|
 | [Whitepaper](WHITEPAPER.md) | Vision, market, roadmap |
-| [Architecture](ARCHITECTURE.md) | Technical design and layering |
+| [Architecture](ARCHITECTURE.md) | Technical design; includes **`ChainPeerRegistry`** + multi-chain extensibility |
 | [MVP specification](MVP_SPECIFICATION.md) | Phase 1 scope and acceptance criteria |
 | [Risk analysis](RISK_ANALYSIS.md) | Risks and mitigations |
 | [Technology stack](TECH_STACK.md) | Tools, frameworks, infra |

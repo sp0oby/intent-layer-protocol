@@ -1,21 +1,25 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {Test} from "forge-std/Test.sol";
-import {IntentSettler} from "../src/IntentSettler.sol";
-import {SolverAuction} from "../src/SolverAuction.sol";
-import {IIntentSettler} from "../src/interfaces/IIntentSettler.sol";
+import { Test } from "forge-std/Test.sol";
+import { ChainPeerRegistry } from "../src/ChainPeerRegistry.sol";
+import { IntentSettler } from "../src/IntentSettler.sol";
+import { SolverAuction } from "../src/SolverAuction.sol";
+import { IIntentSettler } from "../src/interfaces/IIntentSettler.sol";
 
 /// @dev Placeholder for cross-chain + settlement flows.
 contract IntegrationTest is Test {
     function testPlaceholder_stackDeploys() public {
-        new IntentSettler();
+        new IntentSettler(address(0));
         new SolverAuction();
         assertTrue(true);
     }
 
     function testPlaceholder_intentLifecycleStub() public {
-        IntentSettler settler = new IntentSettler();
+        vm.chainId(1);
+        ChainPeerRegistry registry = new ChainPeerRegistry(address(this));
+        registry.setRouteSupported(1, 8453, true);
+        IntentSettler settler = new IntentSettler(address(registry));
         address alice = address(0xA11CE);
         vm.startPrank(alice);
 
