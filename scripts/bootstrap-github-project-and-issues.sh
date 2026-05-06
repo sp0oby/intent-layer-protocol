@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Create a GitHub Project (board) and backlog issues for Intent Layer Protocol.
+# Create a GitHub Project (board) and backlog issues for Intent Protocol Layer.
 #
 # Prerequisites:
 #   gh auth login -h github.com
@@ -62,13 +62,13 @@ else
   done
 
   # --- Epics ---
-  issue "Epic: E1 Contracts skeleton" "Parent issue for Foundry layout, IntentSettler, SolverAuction, libraries, and tests. Close when substories are done." "epic,contracts"
+  issue "Epic: E1 Contracts skeleton" "Parent issue for Foundry layout, ChainPeerRegistry, IntentSettler, SolverAuction, libraries, and tests. Close when substories are done." "epic,contracts"
   issue "Epic: E2 Backend skeleton" "Parent issue for indexer, matching engine, solver API, and Postgres schema." "epic,backend"
   issue "Epic: E3 Frontend skeleton" "Parent issue for Next.js UI, wallet flow, swap + intent status, API integration." "epic,frontend"
   issue "Epic: E4 Platform" "Parent issue for CI, docker-compose, env templates, developer experience." "epic,platform"
 
   # --- Week 1 ---
-  issue "W1-01: Foundry workspace and contract stubs" $'## Scope\n- foundry.toml, remappings, ignore build artifacts\n- IntentSettler: struct, submitIntent stub, IntentSubmitted event, escrow TODO\n- SolverAuction skeleton\n- interfaces/ + libraries/ (IntentHash, SignatureValidator, SafeTransfer)\n\n## Acceptance\n- forge build\n- forge test' "contracts,week-1"
+  issue "W1-01: Foundry workspace and contract stubs" $'## Scope\n- foundry.toml, remappings, ignore build artifacts\n- ChainPeerRegistry + IChainPeerRegistry (EID + route allowlist)\n- IntentSettler: struct, submitIntent (chain + route guards), IntentSubmitted event, escrow TODO\n- SolverAuction skeleton\n- interfaces/ + libraries/ (IntentHash, SignatureValidator, SafeTransfer)\n\n## Acceptance\n- forge build\n- forge test' "contracts,week-1"
 
   issue "W1-02: Foundry test placeholders" $'## Scope\n- Unit + integration test shells\n\n## Acceptance\n- forge test passes' "contracts,week-1"
 
@@ -87,7 +87,7 @@ else
   issue "W1-09: CI workflow" $'## Scope\n- PR workflow: forge test, backend lint/test, frontend lint/build\n\n## Acceptance\n- CI green on main' "platform,week-1"
 
   # --- Weeks 2-4 (high level) ---
-  issue "W2-01: LayerZero OApp wiring (stub)" "Add message encode/decode stubs and interface alignment with docs/ARCHITECTURE.md." "contracts,week-2"
+  issue "W2-01: LayerZero OApp wiring (stub)" "Add message encode/decode stubs and interface alignment with docs/ARCHITECTURE.md; _lzSend resolves dst EID via ChainPeerRegistry.lzEidForChain." "contracts,week-2"
   issue "W2-02: Indexer to Postgres persistence" "Persist indexed intents; idempotent upserts." "backend,week-2"
   issue "W2-03: Contract deployment scripts" "forge script for local + testnet placeholders." "contracts,week-2"
   issue "W3-01: Solver auction flow" "Expand SolverAuction + API per docs/MVP_SPECIFICATION.md." "contracts,backend,week-3"

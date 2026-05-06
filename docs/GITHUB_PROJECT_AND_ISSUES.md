@@ -35,7 +35,7 @@ Create these as Issues and label `epic` (create label if needed). Link child iss
 
 | Epic | Description |
 |------|-------------|
-| E1 — Contracts skeleton | Foundry layout, `IntentSettler`, `SolverAuction`, libs, test stubs |
+| E1 — Contracts skeleton | Foundry layout, `ChainPeerRegistry`, `IntentSettler`, `SolverAuction`, interfaces/libs, tests |
 | E2 — Backend skeleton | Indexer, matching stub, solver API, Postgres schema |
 | E3 — Frontend skeleton | Next.js, Swap + Intent status, wallet, dummy API |
 | E4 — Platform | CI, docker-compose, `.env.example` |
@@ -49,7 +49,8 @@ Create these as Issues and label `epic` (create label if needed). Link child iss
 ```markdown
 ## Scope
 - Add `foundry.toml`, remappings, `.gitignore` for `out/`, `cache/`
-- `src/IntentSettler.sol` — struct + `submitIntent` stub + `IntentSubmitted` event + escrow placeholder
+- `src/ChainPeerRegistry.sol` + `src/interfaces/IChainPeerRegistry.sol` — EID + route allowlist (owner config)
+- `src/IntentSettler.sol` — struct + `submitIntent` with chain + route guards + `IntentSubmitted` event + escrow placeholder
 - `src/SolverAuction.sol` — auction skeleton
 - `src/interfaces/IIntentSettler.sol` (if split)
 - `src/libraries/IntentHash.sol`, `SignatureValidator.sol`, `SafeTransfer.sol` (minimal stubs)
@@ -68,7 +69,7 @@ Milestone: Week 1
 
 ```markdown
 ## Scope
-- `test/IntentSettler.t.sol`, `test/SolverAuction.t.sol`, `test/Integration.t.sol` (shell only)
+- `test/ChainPeerRegistry.t.sol`, `test/IntentSettler.t.sol`, `test/SolverAuction.t.sol`, `test/Integration.t.sol` (shell only)
 
 ## Acceptance
 - Tests compile; can be expanded later

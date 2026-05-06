@@ -50,26 +50,33 @@ alt: Hardhat (if Foundry has issues)
 
 ### Contract Structure
 
+Paths below are relative to the [`contracts/`](../contracts/) Foundry project (`forge build` / `forge test` run from this directory).
+
 ```
 contracts/
-├── ChainPeerRegistry.sol (chainId → LZ endpoint id + route allowlist; one deployment per network)
-├── IntentSettler.sol (main settlement logic; optional registry in constructor)
-├── SolverAuction.sol (fallback auction)
-├── interfaces/
-│   ├── IIntentSettler.sol
-│   ├── IChainPeerRegistry.sol
-│   └── (future: IERC20 or OZ imports as dependencies are added)
-├── libraries/
-│   ├── IntentHash.sol (hashing logic)
-│   ├── SignatureValidator.sol (ECDSA)
-│   └── SafeTransfer.sol (token transfer safety)
-└── test/
-    ├── ChainPeerRegistry.t.sol
-    ├── IntentSettler.t.sol
-    ├── SolverAuction.t.sol
-    ├── CrossChain.t.sol (LayerZero tests — future)
-    └── Integration.t.sol (end-to-end)
+├── foundry.toml
+├── remappings.txt
+├── src/
+│   ├── ChainPeerRegistry.sol   # chainId → LayerZero EID + route allowlist (deploy per network)
+│   ├── IntentSettler.sol       # settlement skeleton; constructor takes optional registry address
+│   ├── SolverAuction.sol
+│   ├── interfaces/
+│   │   ├── IChainPeerRegistry.sol
+│   │   └── IIntentSettler.sol
+│   └── libraries/
+│       ├── IntentHash.sol
+│       ├── SignatureValidator.sol
+│       └── SafeTransfer.sol
+├── test/
+│   ├── ChainPeerRegistry.t.sol
+│   ├── IntentSettler.t.sol
+│   ├── Integration.t.sol
+│   └── SolverAuction.t.sol
+└── lib/
+    └── forge-std/              # vendored — see contracts/README.md
 ```
+
+Token interfaces (e.g. `IERC20`) and LayerZero receiver-facing types typically come from **dependencies** (`forge install`) or `@layerzerolabs/*` when integrated — they are not stubs in `src/interfaces/` yet. Add a dedicated **`test/CrossChain.t.sol`** (or similar) when the LayerZero harness lands.
 
 ### Tooling
 
