@@ -105,8 +105,14 @@ cd frontend && npm install && cd ..
 # Local infra (Postgres, Redis, Anvil)
 docker compose up -d
 
-# Contracts — forge-std is vendored under contracts/lib/forge-std
-cd contracts && forge build && forge test && cd ..
+# Contracts — forge-std is vendored under contracts/lib/forge-std.
+# OpenZeppelin and LayerZero are not committed (size); install once per clone:
+cd contracts
+forge install OpenZeppelin/openzeppelin-contracts@v5.1.0 --no-git --shallow
+forge install LayerZero-Labs/devtools --no-git --shallow
+forge install LayerZero-Labs/LayerZero-v2 --no-git --shallow
+forge build && forge test
+cd ..
 
 # Dev servers (separate terminals)
 cd backend && npm run dev          # API → http://localhost:4000
@@ -116,7 +122,7 @@ cd frontend && npm run dev         # UI  → http://localhost:3000
 To refresh `forge-std` from upstream instead of the vendored copy:
 
 ```bash
-cd contracts && forge install foundry-rs/forge-std --no-commit
+cd contracts && forge install foundry-rs/forge-std --no-git --shallow
 ```
 
 ---

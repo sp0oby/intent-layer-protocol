@@ -16,6 +16,13 @@ contracts/cache/
 contracts/out/
 contracts/broadcast/
 
+# Foundry libs — installed via `forge install` (see README Quickstart).
+# `forge-std/` stays vendored (small, pinned). OpenZeppelin and LayerZero are large
+# (~63 MB combined) and are fetched per-clone, not committed.
+contracts/lib/openzeppelin-contracts/
+contracts/lib/devtools/
+contracts/lib/LayerZero-v2/
+
 # Environment
 .env
 .env.local
@@ -34,3 +41,9 @@ npm-debug.log*
 
 # TypeScript
 *.tsbuildinfo
+
+# Private working documents
+IMPLEMENTATION_CHECKLIST.md
+
+# Claude Code local state
+.claude/

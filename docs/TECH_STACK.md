@@ -33,19 +33,23 @@ alt: Hardhat (if Foundry has issues)
 ### Key Dependencies
 
 ```solidity
-// OpenZeppelin (audited, standard)
-@openzeppelin/contracts ^5.0.0
-- ERC20, ERC721 (token standards)
-- AccessControl (role-based permissions)
-- Ownable (ownership patterns)
+// OpenZeppelin v5.1.0 (audited, standard) — installed via forge install at lib/openzeppelin-contracts
+@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
 - ReentrancyGuard (reentrancy protection)
-- ECDSA (signature verification)
+- SafeERC20 (handles non-standard returns, e.g. USDT)
+- EIP712 (typed structured data hashing)
+- ECDSA (signature recovery)
+- Ownable (ownership patterns)
 
-// LayerZero V2 (cross-chain messaging)
-@layerzerolabs/oapp-evm ^2.0.0
-- OApp (base class for cross-chain apps)
-- Endpoint (LayerZero endpoint)
-- Send options (messaging config)
+// LayerZero V2 (cross-chain messaging) — split across two repos:
+@layerzerolabs/oapp-evm/=lib/devtools/packages/oapp-evm/                   // OApp base contracts
+@layerzerolabs/lz-evm-protocol-v2/=lib/LayerZero-v2/packages/layerzero-v2/evm/protocol/    // ILayerZeroEndpointV2, MessagingFee
+@layerzerolabs/lz-evm-messagelib-v2/=lib/LayerZero-v2/packages/layerzero-v2/evm/messagelib/  // Message library types
+
+// Install commands (vendored, not submodules — matches existing forge-std pattern):
+//   forge install OpenZeppelin/openzeppelin-contracts@v5.1.0 --no-git --shallow
+//   forge install LayerZero-Labs/devtools --no-git --shallow
+//   forge install LayerZero-Labs/LayerZero-v2 --no-git --shallow
 ```
 
 ### Contract Structure

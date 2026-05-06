@@ -15,6 +15,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
+      - name: Install Solidity dependencies
+        run: |
+          forge install OpenZeppelin/openzeppelin-contracts@v5.1.0 --no-git --shallow
+          forge install LayerZero-Labs/devtools --no-git --shallow
+          forge install LayerZero-Labs/LayerZero-v2 --no-git --shallow
       - name: Forge build
         run: forge build
       - name: Forge test
