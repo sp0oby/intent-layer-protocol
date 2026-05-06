@@ -1,6 +1,6 @@
 # Backend — Intent Layer Protocol
 
-**Stack:** Node.js 18+, TypeScript, **Express**, **ethers v6**, **PostgreSQL** (via `pg`), **Vitest** for tests.
+**Stack:** Node.js **20** (CI version; 18+ often works), TypeScript, **Express**, **ethers v6**, **PostgreSQL** (via `pg`), **Vitest** for tests.
 
 **Role in the repo:** Off-chain services — REST API for solvers/frontends, **in-memory matching stub**, **indexer placeholder** for `IntentSubmitted`-style events, and SQL migrations for the order-book schema.
 

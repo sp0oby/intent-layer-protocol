@@ -10,6 +10,7 @@ Thank you for helping build cross-chain intent infrastructure. This document exp
 - **Small, reviewable PRs:** Prefer focused changes over large refactors unless agreed in an issue first.
 - **Tests required:** Contract changes must keep `forge test` green; backend and frontend changes should preserve existing tests and add coverage for new logic.
 - **No secrets:** Never commit private keys, RPC API keys, or `.env` files. Use [`.env.example`](.env.example) only.
+- **Security:** Report vulnerabilities privately — see [**SECURITY.md**](SECURITY.md).
 
 ---
 
@@ -17,7 +18,7 @@ Thank you for helping build cross-chain intent infrastructure. This document exp
 
 See the [README](README.md) **Quickstart**. Minimum checklist:
 
-1. `docker compose up -d` for Postgres / Redis / Anvil (optional but recommended).
+1. `docker compose up -d` for Postgres / Redis / Anvil (optional for `backend` **Vitest** today, but recommended so `/health` can report `database: true` and matches production-like setup).
 2. `cd contracts && forge test`
 3. `cd backend && npm install && npm run lint && npm test`
 4. `cd frontend && npm install && npm run lint && npm run build`
@@ -69,4 +70,4 @@ Be respectful and assume good intent. Disagreement about architecture is expecte
 
 ## Questions
 
-Open a **Discussion** or **Issue** on GitHub, or reference [`docs/GITHUB_PROJECT_AND_ISSUES.md`](docs/GITHUB_PROJECT_AND_ISSUES.md) for planned workstreams.
+Open an **Issue** on GitHub (enable **Discussions** on the repo if you want a lighter-weight Q&A channel). Planned workstreams and maintainer scripts are in [`docs/GITHUB_PROJECT_AND_ISSUES.md`](docs/GITHUB_PROJECT_AND_ISSUES.md).

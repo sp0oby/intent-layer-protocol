@@ -93,9 +93,9 @@ Foundry anvil               # Local blockchain
 ## Backend (Off-Chain Services)
 
 ### Language
-- **TypeScript (Node.js 18+)**
+- **TypeScript (Node.js 20+)** — align with repository CI (`.github/workflows/ci.yml`)
 - Reason: Type-safe, large crypto ecosystem, easy to hire
-- Runtime: Node.js 18 LTS
+- Runtime: Node.js 20 LTS (current CI target)
 
 ### Service Architecture
 

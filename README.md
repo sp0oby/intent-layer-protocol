@@ -17,6 +17,7 @@ This repository contains the **protocol specification**, a **working dev skeleto
 - [Current status](#current-status)
 - [Repository layout](#repository-layout)
 - [Documentation](#documentation)
+- [For new contributors](#for-new-contributors)
 - [Quickstart](#quickstart)
 - [Scripts & quality gates](#scripts--quality-gates)
 - [Project board and issues (maintainers)](#project-board-and-issues-maintainers)
@@ -60,6 +61,7 @@ Treat on-chain code as **templates to extend**, not audited production assets.
 | [`docker-compose.yml`](docker-compose.yml) | Local Postgres, Redis, Anvil |
 | [`.env.example`](.env.example) | Non-secret configuration template |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | How to contribute — branches, PR expectations, review norms |
+| [`SECURITY.md`](SECURITY.md) | How to report vulnerabilities privately |
 
 ---
 
@@ -75,12 +77,21 @@ Treat on-chain code as **templates to extend**, not audited production assets.
 | [Research guide](docs/RESEARCH_CODEBASE_GUIDE.md) | Reference protocols and reading plan |
 | [Timeline and checklist](docs/TIMELINE_CHECKLIST.md) | Milestones and checklists |
 | [GitHub Projects and issues](docs/GITHUB_PROJECT_AND_ISSUES.md) | Board setup and issue templates |
+| [Documentation index (browse `docs/`)](docs/README.md) | Short TOC for the `docs/` folder |
+
+---
+
+## For new contributors
+
+1. Read [**CONTRIBUTING.md**](CONTRIBUTING.md), [**docs/MVP_SPECIFICATION.md**](docs/MVP_SPECIFICATION.md), and [**docs/ARCHITECTURE.md**](docs/ARCHITECTURE.md) before large changes.
+2. Use [**docs/TIMELINE_CHECKLIST.md**](docs/TIMELINE_CHECKLIST.md) and [GitHub Issues](https://github.com/sp0oby/intent-layer-protocol/issues) to pick scoped work; maintainer board setup is in [**docs/GITHUB_PROJECT_AND_ISSUES.md**](docs/GITHUB_PROJECT_AND_ISSUES.md).
+3. Run the [**Quickstart**](#quickstart) locally and keep **CI green** (Foundry + backend + frontend) before opening a PR.
 
 ---
 
 ## Quickstart
 
-**Prerequisites:** Node.js **18+**, **Docker**, **Foundry** (`forge`, `anvil`).
+**Prerequisites:** Node.js **20** (matches CI; **18+** often works locally), **Docker**, **Foundry** (`forge`, `anvil`).
 
 ```bash
 git clone https://github.com/sp0oby/intent-layer-protocol.git
@@ -149,7 +160,7 @@ This codebase is **early-stage**. **Do not** assume safety for real funds.
 
 - Use internal review, **Slither**, and **Foundry fuzzing** during development.
 - Schedule **external audits** before high-limit or broad mainnet exposure when budget allows ([Risk analysis](docs/RISK_ANALYSIS.md)).
-- Report suspected vulnerabilities responsibly (process TBD; open a private security advisory on GitHub if enabled).
+- Report suspected vulnerabilities per [**SECURITY.md**](SECURITY.md) (private GitHub advisory preferred).
 
 ---
 
@@ -160,6 +171,9 @@ Distributed under the [MIT License](LICENSE).
 ---
 
 ## FAQ
+
+**Should I run `npm audit`?**  
+Yes, periodically — especially before releases. The skeleton may pin versions with known advisories; upgrading (for example **Next.js** patch releases) should be done deliberately with a quick smoke test of the app.
 
 **Are the smart contracts “done”?**  
 No. They are **intentional templates**: interfaces, structs, events, and stub logic so the repo builds and tests run. Escrow, messaging, auctions, and economic security must be implemented and reviewed before any deployment.
