@@ -1,4 +1,4 @@
-# Intent Layer Protocol — MVP Specification
+# Intent Protocol Layer — MVP Specification
 
 **Audience:** Core contributors, auditors, product · **Version:** 1.0 · **Status:** Active — specification guides implementation (repo contains dev skeletons, not production-ready protocol code)  
 **See also:** [README](../README.md) · [Architecture](ARCHITECTURE.md) · [Technology stack](TECH_STACK.md) · [Timeline](TIMELINE_CHECKLIST.md) · [Contributing](../CONTRIBUTING.md)
@@ -236,6 +236,7 @@ So tokens move correctly on both chains
 - [ ] Ethereum confirms and releases tokens to Base user
 - [ ] Settlement completes within 5 minutes (finality)
 - [ ] If one chain fails, both refund after timeout
+- [ ] **Extensibility:** settlement paths use **configurable peers / endpoint IDs** (e.g. OApp `setPeer` + registry or storage), not hardcoded “Base-only” branches; `intent.sourceChainId` / `intent.destChainId` drive routing
 
 **Settlement States:**
 
@@ -257,31 +258,41 @@ function executeMatching(bytes32 ethIntentHash, bytes32 baseIntentHash) {
     require(ethIntent.state == IntentState.MATCHED);
     ethIntent.state = IntentState.LOCKED;
     
-    // Send message to Base
+    // Send message to destination chain (LayerZero dstEid from registry, not a literal)
+    // Include source chain id for return-path routing — avoids hardcoding “confirm to Ethereum”
     bytes memory payload = abi.encode(
+        uint8(1), // messageVersion — increment when payload shape changes
         baseIntentHash,
         ethIntent.sourceAmount,
-        ethIntent.user
+        ethIntent.user,
+        ethIntent.sourceChainId
     );
-    _lzSend(DEST_EID_BASE, payload, options);
+    _lzSend(registry.lzEidForChain(ethIntent.destChainId), payload, options);
 }
 
-// Phase 2: Lock on Base (receive from Ethereum)
-function _lzReceive(bytes memory payload) {
-    (bytes32 baseIntentHash, uint256 amount, address userEth) = abi.decode(payload, (bytes32, uint256, address));
+// Phase 2: On destination chain — receive from source (LayerZero delivers _srcEid + payload)
+function _lzReceive(uint32 _srcEid, bytes memory payload) {
+    // require(registry.isTrustedPeer(_srcEid));
+    (
+        uint8 messageVersion,
+        bytes32 remoteIntentHash,
+        uint256 amount,
+        address userEth,
+        uint256 originalSourceChainId
+    ) = abi.decode(payload, (uint8, bytes32, uint256, address, uint256));
+    require(messageVersion == 1, "bad version");
     
-    Intent memory baseIntent = intents[baseIntentHash];
+    Intent memory baseIntent = intents[remoteIntentHash];
     require(baseIntent.state == IntentState.MATCHED);
     baseIntent.state = IntentState.LOCKED;
     
     // Release USDC to Ethereum user on Base
     USDC_BASE.transfer(userEth, baseIntent.sourceAmount);
     
-    // Send confirmation back
-    _lzSend(DEST_EID_ETHEREUM, abi.encode(baseIntentHash), options);
+    _lzSend(registry.lzEidForChain(originalSourceChainId), abi.encode(remoteIntentHash), options);
 }
 
-// Phase 3: Confirm on Ethereum (receive from Base)
+// Phase 3: Confirm on source chain (receive from destination)
 function _lzReceiveConfirm() {
     ethIntent.state = IntentState.SETTLED;
     ETH.transfer(baseIntentUser, ethIntent.sourceAmount);
@@ -293,6 +304,7 @@ function _lzReceiveConfirm() {
 - Atomicity: both chains settle or both refund
 - Timeout works correctly
 - No stuck funds or partial settlements
+- Adding a later chain is primarily **new deployment + `setPeer` / route config**, not a rewrite of settlement logic (see [Architecture — Multi-chain extensibility](ARCHITECTURE.md#multi-chain-extensibility-design-now-scale-later))
 
 ### Feature 5: Web UI & User Experience
 

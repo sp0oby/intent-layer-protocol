@@ -38,7 +38,7 @@ forge test
 
 ## Design intent (high level)
 
-- **`IntentSettler`** — record intents, emit events; escrow and cross-chain messaging **TODO** per MVP spec.
+- **`IntentSettler`** — record intents, emit events; escrow and cross-chain messaging **TODO** per MVP spec. Design for **configurable peers / routes** when wiring LayerZero (see [`IChainPeerRegistry.sol`](src/interfaces/IChainPeerRegistry.sol) and [**Architecture**](../docs/ARCHITECTURE.md) — multi-chain extensibility).
 - **`SolverAuction`** — shape for solver proposals; ranking and execution **TODO**.
 - **Libraries** — hashing and transfer/signature helpers to be hardened (e.g. OpenZeppelin, EIP-712) before mainnet.
 

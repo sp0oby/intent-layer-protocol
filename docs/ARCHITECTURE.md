@@ -341,6 +341,32 @@ contract IntentSettler is OApp {
 }
 ```
 
+### Multi-chain extensibility (design now, scale later)
+
+Phase 1 ships **Ethereum + Base**, but settlement should be **chain-agnostic** so adding another chain is **ops + configuration**, not a rewrite.
+
+**Principles**
+
+1. **One logical contract per chain** — deploy the same `IntentSettler` (and auction/OApp peers) on each chain you support. A new chain means a **new deployment there**, not a new “protocol version” unless you intentionally upgrade logic.
+2. **No hardcoded destinations in core logic** — Resolve “where to send this message” from **`intent.destChainId`** plus a **configurable mapping** (e.g. LayerZero **endpoint id `dstEid`** → trusted **remote OApp address**). LayerZero’s **OApp `setPeer`** pattern is the standard way to register remotes per destination endpoint id.
+3. **Validate the intent against this chain** — On `submitIntent`, require `intent.sourceChainId == block.chainid` (or equivalent) so users cannot replay intents meant for another origin.
+4. **Support matrix is explicit** — Maintain an **allowlist** (or tiered limits) for `(sourceChainId, destChainId, token…)` so you can enable routes gradually and tune risk per corridor.
+5. **Version cross-chain payloads** — Prefix `abi.encode` payloads with a **`uint8 messageVersion`** (or use typed structured hashes) so you can evolve formats without breaking old peers; old peers ignore or reject unknown versions cleanly.
+6. **Governance or admin for topology changes** — Whoever controls `setPeer` / allowlist updates should be **multisig / timelock / governance** in production, not an EOA.
+
+**What “add Arbitrum” looks like (target state)**
+
+- Deploy `IntentSettler` (OApp) on Arbitrum; wire LayerZero endpoint.
+- On **Ethereum, Base, and Arbitrum**, call **`setPeer(arbitrumEid, arbitrumSettlerAddress)`** (and reciprocal peers) so every participant trusts the new remote.
+- Update **off-chain** config (indexer RPC, matcher supported pairs, UI chain list).
+- No redeploy on old chains **if** peers and routes were always **storage-driven**; you only redeploy if you need a **new bytecode** for unrelated reasons.
+
+**Anti-patterns to avoid in implementation**
+
+- Constants like `DEST_EID_BASE` baked into settlement paths (fine in **tests**, not in production `IntentSettler`).
+- Separate “EthereumToBaseSettler” and “BaseToEthereumSettler” contracts — use **one** settler + **direction in the intent**.
+- Accepting messages from any LayerZero source without checking **`_srcEid`** against a **trusted peer** mapping.
+
 ### Atomicity & Safety
 
 **Problem:** What if Ethereum confirms but Base fails?
