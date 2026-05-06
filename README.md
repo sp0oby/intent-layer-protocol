@@ -16,7 +16,6 @@ This repository contains the **protocol specification**, a **working dev skeleto
 - [Why this project](#why-this-project)
 - [Current status](#current-status)
 - [Repository layout](#repository-layout)
-- [Understanding `contracts/` (no “lib2” folders)](#understanding-contracts-no-lib2-folders)
 - [Quickstart](#quickstart)
 - [Scripts & quality gates](#scripts--quality-gates)
 - [Project board and issues (maintainers)](#project-board-and-issues-maintainers)
@@ -60,18 +59,6 @@ Treat on-chain code as **templates to extend**, not audited production assets.
 | [`docker-compose.yml`](docker-compose.yml) | Local Postgres, Redis, Anvil |
 | [`.env.example`](.env.example) | Non-secret configuration template |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | How to contribute — branches, PR expectations, review norms |
-
----
-
-## Understanding `contracts/` (no “lib2” folders)
-
-Foundry uses a standard triad at the **project root** (`contracts/`):
-
-- **`src/`** — *your* protocol contracts (`IntentSettler.sol`, `SolverAuction.sol`, interfaces, libraries).
-- **`test/`** — *your* Foundry tests.
-- **`lib/`** — **third-party dependencies** (here: **`forge-std`**, the testing/stdlib package from [Foundry](https://github.com/foundry-rs/forge-std)).
-
-Because **`forge-std` is itself a Foundry project**, you will see **`lib/forge-std/src/`** and **`lib/forge-std/test/`** inside the dependency. That is normal: it is **not** a duplicate “src2” layer — it is the dependency’s own source tree, nested under `lib/`.
 
 ---
 
@@ -160,9 +147,6 @@ Distributed under the [MIT License](LICENSE).
 
 **Are the smart contracts “done”?**  
 No. They are **intentional templates**: interfaces, structs, events, and stub logic so the repo builds and tests run. Escrow, messaging, auctions, and economic security must be implemented and reviewed before any deployment.
-
-**What if I see paths like `lib/.../src/` — is that `src2`?**  
-No. Only **`contracts/src`** is your protocol source. Nested `src` under **`contracts/lib/*`** belongs to **dependencies** (e.g. forge-std).
 
 **Who maintains this?**  
 Project founder: **[@sp0oby](https://github.com/sp0oby)**. Contributors welcome per [CONTRIBUTING.md](CONTRIBUTING.md).
