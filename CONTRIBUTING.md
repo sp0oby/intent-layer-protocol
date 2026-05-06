@@ -1,4 +1,4 @@
-# Contributing to Intent Protocol Layer
+# Contributing to Intent Layer Protocol
 
 Thank you for helping build cross-chain intent infrastructure. This document explains how we work and what we look for in contributions.
 

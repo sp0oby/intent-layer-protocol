@@ -1,4 +1,4 @@
-# Intent Protocol Layer — Whitepaper
+# Intent Layer Protocol — Whitepaper
 
 **Audience:** Partners, contributors, investors · **Version:** 1.0 · **Status:** Living document (evolves with research and implementation)  
 **See also:** [README](../README.md) · [Architecture](ARCHITECTURE.md) · [MVP specification](MVP_SPECIFICATION.md) · [Contributing](../CONTRIBUTING.md)
@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-Intent Protocol Layer is a next-generation cross-chain liquidity protocol that simplifies multi-chain asset transfers through **intent-to-intent matching** and **intuitive user experience**. Instead of forcing users to manually select bridges and track slippage, users simply express their intent ("I want USDC on Base, funded with ETH on Ethereum") and the protocol handles optimal execution.
+Intent Layer Protocol is a next-generation cross-chain liquidity protocol that simplifies multi-chain asset transfers through **intent-to-intent matching** and **intuitive user experience**. Instead of forcing users to manually select bridges and track slippage, users simply express their intent ("I want USDC on Base, funded with ETH on Ethereum") and the protocol handles optimal execution.
 
 **Core Mission:** Make cross-chain transactions as simple as single-chain swaps.
 
@@ -65,7 +65,7 @@ Intent Protocol Layer is a next-generation cross-chain liquidity protocol that s
 
 ## Solution Overview
 
-### What is Intent Protocol Layer?
+### What is Intent Layer Protocol?
 
 A **three-tier system** combining:
 
@@ -191,7 +191,7 @@ A **three-tier system** combining:
 
 ## Token Economics
 
-### Intent Protocol Layer Token (IPL)
+### Intent Layer Protocol Token (ILP)
 
 **Utility:**
 - Solver staking (collateral for execution)
@@ -200,7 +200,7 @@ A **three-tier system** combining:
 - Incentives (liquidity mining)
 
 **Supply:**
-- Total Supply: 100M IPL
+- Total Supply: 100M ILP
 - Distribution:
   - Team: 20% (4-year vesting)
   - Community: 30% (airdrops, rewards)
@@ -253,7 +253,7 @@ A **three-tier system** combining:
 
 ## Competitive Analysis
 
-| Feature | Intent Protocol Layer | UniswapX | CoW Protocol | Across | LiFi |
+| Feature | Intent Layer Protocol | UniswapX | CoW Protocol | Across | LiFi |
 |---------|----------------------|----------|--------------|--------|------|
 | Cross-Chain P2P Matching | Yes | No | Single-chain | No | No |
 | Simple UX | Yes | Good | Good | Okay | Okay |
@@ -299,14 +299,14 @@ A **three-tier system** combining:
 
 **Founder & Lead Developer:** @sp0oby
 - Blockchain developer with expertise in cross-chain protocols
-- Building Intent Protocol Layer solo initially
+- Building Intent Layer Protocol solo initially
 - Seeking co-founders in Q2 2026
 
 ---
 
 ## Conclusion
 
-Intent Protocol Layer addresses a critical gap in cross-chain infrastructure by combining the best of CoW Protocol (solver auctions, intent matching) with cross-chain capabilities. By prioritizing simple UX and direct P2P matching, we believe we can capture meaningful market share and become the standard for cross-chain asset transfers.
+Intent Layer Protocol addresses a critical gap in cross-chain infrastructure by combining the best of CoW Protocol (solver auctions, intent matching) with cross-chain capabilities. By prioritizing simple UX and direct P2P matching, we believe we can capture meaningful market share and become the standard for cross-chain asset transfers.
 
 ---
 

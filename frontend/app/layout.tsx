@@ -15,7 +15,7 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: 'Intent Protocol Layer',
+  title: 'Intent Layer Protocol',
   description: 'Cross-chain intent matching — Ethereum ↔ Base (MVP skeleton)',
 };
 

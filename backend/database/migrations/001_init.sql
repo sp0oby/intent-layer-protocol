@@ -1,4 +1,4 @@
--- Intent Protocol Layer — initial schema (skeleton)
+-- Intent Layer Protocol — initial schema (skeleton)
 CREATE TABLE IF NOT EXISTS intents (
     id BIGSERIAL PRIMARY KEY,
     intent_hash BYTEA UNIQUE NOT NULL,

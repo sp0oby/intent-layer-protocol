@@ -1,4 +1,4 @@
-# Frontend — Intent Protocol Layer
+# Frontend — Intent Layer Protocol
 
 **Stack:** Next.js 14 (App Router), TypeScript, Tailwind CSS, **wagmi** + **viem**, **TanStack Query**, **Zustand**, **Framer Motion**, shadcn-style UI primitives (e.g. [`components/ui/button.tsx`](components/ui/button.tsx)).
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Create a GitHub Project (board) and backlog issues for Intent Protocol Layer.
+# Create a GitHub Project (board) and backlog issues for Intent Layer Protocol.
 #
 # Prerequisites:
 #   gh auth login -h github.com

@@ -1,4 +1,4 @@
-# Intent Protocol Layer — Technical Architecture
+# Intent Layer Protocol — Technical Architecture
 
 **Audience:** Protocol engineers, security reviewers, senior contributors · **Version:** 1.0 · **Status:** Design baseline for Phase 1 MVP  
 **See also:** [README](../README.md) · [MVP specification](MVP_SPECIFICATION.md) · [Technology stack](TECH_STACK.md) · [Contributing](../CONTRIBUTING.md)
@@ -7,7 +7,7 @@
 
 ## Overview
 
-Intent Protocol Layer uses a three-layer architecture to enable cross-chain intent matching:
+Intent Layer Protocol uses a three-layer architecture to enable cross-chain intent matching:
 
 ```
 Layer 1: User Expression Layer
@@ -433,7 +433,7 @@ Per-intent operations:
 **Competitive vs. current bridges:**
 - Stargate: ~0.25%
 - Across: ~0.15%
-- Intent Protocol Layer: 0.10% + gas
+- Intent Layer Protocol: 0.10% + gas
 
 **Optimization Strategies:**
 - Batch settlements - Process 10+ intents in one transaction
@@ -457,7 +457,7 @@ Per-intent operations:
 
 **3. Solver Griefing**
 - Problem: Solver submits valid proposal but doesn't execute
-- Mitigation: Solver must bond collateral (IPL tokens later)
+- Mitigation: Solver must bond collateral (ILP tokens later)
 - Current: Rate limiting + reputation system
 
 **4. Double Settlement**

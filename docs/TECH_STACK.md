@@ -1,4 +1,4 @@
-# Intent Protocol Layer — Technology Stack
+# Intent Layer Protocol — Technology Stack
 
 **Audience:** Engineers joining the project · **Version:** 1.0 · **Status:** Baseline choices for Phase 1; adjust via ADR or PR when swapping tools  
 **See also:** [README](../README.md) · [Architecture](ARCHITECTURE.md) · [MVP specification](MVP_SPECIFICATION.md) · [Contributing](../CONTRIBUTING.md)

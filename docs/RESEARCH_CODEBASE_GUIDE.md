@@ -5,7 +5,7 @@
 
 ---
 
-This document guides you through understanding existing intent-based and cross-chain protocols to inform design decisions for Intent Protocol Layer.
+This document guides you through understanding existing intent-based and cross-chain protocols to inform design decisions for Intent Layer Protocol.
 
 ---
 

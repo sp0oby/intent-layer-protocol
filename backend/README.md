@@ -1,4 +1,4 @@
-# Backend — Intent Protocol Layer
+# Backend — Intent Layer Protocol
 
 **Stack:** Node.js 18+, TypeScript, **Express**, **ethers v6**, **PostgreSQL** (via `pg`), **Vitest** for tests.
 

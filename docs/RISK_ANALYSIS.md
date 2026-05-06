@@ -1,4 +1,4 @@
-# Intent Protocol Layer — Risk Analysis & Mitigation
+# Intent Layer Protocol — Risk Analysis & Mitigation
 
 **Audience:** Founders, engineers, future auditors · **Version:** 1.0 · **Status:** Complete for planning; revisit quarterly or before mainnet scaling  
 **See also:** [README](../README.md) · [Architecture](ARCHITECTURE.md) · [MVP specification](MVP_SPECIFICATION.md) · [Contributing](../CONTRIBUTING.md)

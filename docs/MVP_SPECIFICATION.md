@@ -1,4 +1,4 @@
-# Intent Protocol Layer — MVP Specification
+# Intent Layer Protocol — MVP Specification
 
 **Audience:** Core contributors, auditors, product · **Version:** 1.0 · **Status:** Active — specification guides implementation (repo contains dev skeletons, not production-ready protocol code)  
 **See also:** [README](../README.md) · [Architecture](ARCHITECTURE.md) · [Technology stack](TECH_STACK.md) · [Timeline](TIMELINE_CHECKLIST.md) · [Contributing](../CONTRIBUTING.md)
