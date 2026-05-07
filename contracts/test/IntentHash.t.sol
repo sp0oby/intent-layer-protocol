@@ -116,6 +116,20 @@ contract IntentHashTest is Test {
         assertTrue(hashA != hashB, "refundTo must affect hash");
     }
 
+    /// @notice The on-chain `hashIntent` view helper must return the exact
+    ///         hash that `submitIntent` will store, so frontends can derive
+    ///         the canonical id without re-implementing EIP-712 off-chain.
+    function testHashIntent_matchesSubmitIntentReturn() public {
+        IIntentSettler.Intent memory intent = _baseIntent();
+        intent.user = address(this);
+        vm.deal(address(this), 5 ether);
+
+        bytes32 viaView = settler.hashIntent(intent);
+        bytes32 viaSubmit = settler.submitIntent{ value: 1 ether }(intent);
+
+        assertEq(viaView, viaSubmit, "hashIntent must match submitIntent storage key");
+    }
+
     /// @notice Required so the test contract itself can act as `intent.user` and
     ///         receive any refunds in `testHash_matchesEIP712Digest`.
     receive() external payable { }

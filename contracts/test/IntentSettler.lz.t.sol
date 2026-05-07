@@ -133,7 +133,7 @@ contract IntentSettlerLzTest is Test {
 
         // ---- Match on Ethereum (source side) ----
         vm.chainId(uint256(ETH_EID));
-        ethSettler.executeMatching{ value: 1 wei }(aliceHash, bobHash, 2400e6, 1 ether);
+        ethSettler.executeMatching{ value: 1 wei }(aliceHash, bobHash);
         assertEq(uint256(ethSettler.intentStates(aliceHash)), uint256(IIntentSettler.IntentState.Matched));
         assertEq(lz.pending(), 1, "EXECUTE_MATCH queued");
 
@@ -167,7 +167,7 @@ contract IntentSettlerLzTest is Test {
         vm.prank(alice);
         bytes32 aliceHash = ethSettler.submitIntent{ value: 1 ether }(_aliceIntent(2));
 
-        ethSettler.executeMatching{ value: 1 wei }(aliceHash, bytes32(uint256(0xCAFE)), 2400e6, 1 ether);
+        ethSettler.executeMatching{ value: 1 wei }(aliceHash, bytes32(uint256(0xCAFE)));
 
         // Drop the LZ message instead of delivering.
         lz.dropNext();
@@ -197,7 +197,7 @@ contract IntentSettlerLzTest is Test {
         vm.prank(alice);
         bytes32 aliceHash = ethSettler.submitIntent{ value: 1 ether }(_aliceIntent(3));
 
-        ethSettler.executeMatching{ value: 1 wei }(aliceHash, bytes32(uint256(0xCAFE)), 2400e6, 1 ether);
+        ethSettler.executeMatching{ value: 1 wei }(aliceHash, bytes32(uint256(0xCAFE)));
 
         // Delivery to Base reverts because Base no longer trusts EID 1.
         vm.chainId(uint256(BASE_EID));
@@ -228,7 +228,7 @@ contract IntentSettlerLzTest is Test {
 
         // Match on Ethereum.
         vm.chainId(uint256(ETH_EID));
-        ethSettler.executeMatching{ value: 1 wei }(aliceHash, bobHash, 2400e6, 1 ether);
+        ethSettler.executeMatching{ value: 1 wei }(aliceHash, bobHash);
         assertEq(lz.pending(), 1, "EXECUTE_MATCH queued");
 
         // Deliver EXECUTE_MATCH to Base — Bob's USDC released to Alice.
@@ -287,7 +287,18 @@ contract IntentSettlerLzTest is Test {
         // Send EXECUTE_MATCH payload as if Bob's intent matches some intent
         // on chain 99. Mock captures srcEid=99 because address(this) is
         // registered there.
-        bytes memory payload = abi.encode(uint8(1), uint8(1), bytes32(uint256(0xCAFE)), bobHash, address(0xEEE));
+        bytes memory payload = abi.encode(
+            uint8(1),
+            uint8(1),
+            bytes32(uint256(0xCAFE)),
+            bobHash,
+            address(0xEEE),
+            address(usdc),
+            uint256(2400e6),
+            address(0),
+            uint256(1 ether),
+            uint256(BASE_EID)
+        );
         vm.deal(address(this), 1 wei);
         lz.send{ value: 1 wei }(
             _params(BASE_EID, _addrToBytes32(address(baseSettler)), payload), payable(address(this))
@@ -424,7 +435,7 @@ contract IntentSettlerLzTest is Test {
 
         // ---- Backend calls executeMatching on Eth (from Auctioning state) ----
         vm.chainId(uint256(ETH_EID));
-        ethSettler.executeMatching{ value: 1 wei }(aliceHash, solverHash, 2410e6, 1 ether);
+        ethSettler.executeMatching{ value: 1 wei }(aliceHash, solverHash);
         assertEq(uint256(ethSettler.intentStates(aliceHash)), uint256(IIntentSettler.IntentState.Matched));
         assertEq(lz.pending(), 1, "EXECUTE_MATCH queued");
 
@@ -440,6 +451,274 @@ contract IntentSettlerLzTest is Test {
         lz.deliverNext();
         assertEq(uint256(ethSettler.intentStates(aliceHash)), uint256(IIntentSettler.IntentState.Settled));
         assertEq(solver.balance, solverEthBalBefore + 1 ether, "solver received ETH on Eth");
+    }
+
+    // -----------------------------------------------------------------------
+    // On-chain price / token / chain validation (Concern A)
+    //
+    // Each test below uses the same Alice + Bob setup but tampers with one
+    // dimension of compatibility. The destination must reject every mismatch
+    // because the price/token/chain check now uses only trusted data
+    // (this chain's stored intent + peer-authenticated payload from source).
+    // -----------------------------------------------------------------------
+
+    function _submitAlice(uint256 nonce_) internal returns (bytes32) {
+        vm.chainId(uint256(ETH_EID));
+        vm.deal(alice, 5 ether);
+        vm.prank(alice);
+        return ethSettler.submitIntent{ value: 1 ether }(_aliceIntent(nonce_));
+    }
+
+    function _submitBob(IIntentSettler.Intent memory intent) internal returns (bytes32) {
+        vm.chainId(uint256(BASE_EID));
+        usdc.mint(bob, intent.sourceAmount);
+        vm.startPrank(bob);
+        usdc.approve(address(baseSettler), intent.sourceAmount);
+        bytes32 h = baseSettler.submitIntent(intent);
+        vm.stopPrank();
+        return h;
+    }
+
+    /// @notice Alice wants USDC; Bob is offering a different token (WETH-like).
+    ///         Destination must reject with `TokenMismatch`, leaving Alice's
+    ///         escrow refundable via `refundIfLzTimeout`.
+    function testLz_dest_rejectsTokenMismatch() public {
+        bytes32 aliceHash = _submitAlice(70);
+
+        // Bob escrows a different token on Base — not the USDC Alice wants.
+        MockERC20 weth = new MockERC20("WETH", "WETH", 18);
+        IIntentSettler.Intent memory bob_ = _bobIntent(70);
+        bob_.sourceToken = address(weth);
+        // Mint + approve WETH instead.
+        weth.mint(bob, 2400e6);
+        vm.chainId(uint256(BASE_EID));
+        vm.startPrank(bob);
+        weth.approve(address(baseSettler), 2400e6);
+        bytes32 bobHash = baseSettler.submitIntent(bob_);
+        vm.stopPrank();
+
+        vm.chainId(uint256(ETH_EID));
+        ethSettler.executeMatching{ value: 1 wei }(aliceHash, bobHash);
+
+        vm.chainId(uint256(BASE_EID));
+        vm.expectRevert(IntentSettler.TokenMismatch.selector);
+        lz.deliverNext();
+
+        // Alice's intent stuck at Matched until LZ_TIMEOUT — funds delayed,
+        // not lost.
+        assertEq(uint256(ethSettler.intentStates(aliceHash)), uint256(IIntentSettler.IntentState.Matched));
+    }
+
+    /// @notice Bob's `sourceAmount` (what he's escrowed) is below Alice's
+    ///         `minDestAmount`. Destination must reject with
+    ///         `AmountBelowMinimum` because the price guarantee Alice signed
+    ///         is enforced on chain — the matcher cannot bypass it.
+    function testLz_dest_rejectsBobAmountBelowAliceMin() public {
+        bytes32 aliceHash = _submitAlice(71);
+
+        // Bob escrows only 100 USDC — far below Alice's minDestAmount of 2400.
+        IIntentSettler.Intent memory bob_ = _bobIntent(71);
+        bob_.sourceAmount = 100e6;
+        bytes32 bobHash = _submitBob(bob_);
+
+        vm.chainId(uint256(ETH_EID));
+        ethSettler.executeMatching{ value: 1 wei }(aliceHash, bobHash);
+
+        vm.chainId(uint256(BASE_EID));
+        vm.expectRevert(IntentSettler.AmountBelowMinimum.selector);
+        lz.deliverNext();
+
+        assertEq(uint256(baseSettler.intentStates(bobHash)), uint256(IIntentSettler.IntentState.Pending));
+    }
+
+    /// @notice Alice's `sourceAmount` is below Bob's `minDestAmount` — the
+    ///         destination still rejects, defending Bob from being matched
+    ///         into a bad trade by a malicious matcher.
+    function testLz_dest_rejectsAliceAmountBelowBobMin() public {
+        // Alice intent with low sourceAmount.
+        IIntentSettler.Intent memory alice_ = _aliceIntent(72);
+        alice_.sourceAmount = 0.1 ether;
+        vm.chainId(uint256(ETH_EID));
+        vm.deal(alice, 5 ether);
+        vm.prank(alice);
+        bytes32 aliceHash = ethSettler.submitIntent{ value: 0.1 ether }(alice_);
+
+        // Bob expects at least 1 ETH — Alice can't satisfy this.
+        IIntentSettler.Intent memory bob_ = _bobIntent(72);
+        bob_.minDestAmount = 1 ether;
+        bytes32 bobHash = _submitBob(bob_);
+
+        vm.chainId(uint256(ETH_EID));
+        ethSettler.executeMatching{ value: 1 wei }(aliceHash, bobHash);
+
+        vm.chainId(uint256(BASE_EID));
+        vm.expectRevert(IntentSettler.AmountBelowMinimum.selector);
+        lz.deliverNext();
+    }
+
+    /// @notice The dest validates that `aliceDestChainId == block.chainid`.
+    ///         If a source registry was misconfigured to route to the wrong
+    ///         chain, the dest still self-protects.
+    function testLz_dest_rejectsWrongChainId() public {
+        bytes32 bobHash = _submitBob(_bobIntent(73));
+
+        // Hand-craft a payload claiming alice's destChainId is some wrong value.
+        bytes memory payload = abi.encode(
+            uint8(1), // MSG_EXECUTE_MATCH
+            uint8(1), // MSG_VERSION
+            bytes32(uint256(0xCAFE)), // sourceHash (alice on ETH)
+            bobHash,
+            address(0xA11CE), // sourceUser
+            address(0), // sourceSourceToken (ETH)
+            uint256(1 ether), // sourceSourceAmount
+            address(usdc), // sourceDestToken
+            uint256(2400e6), // sourceMinDestAmount
+            uint256(99) // sourceDestChainId — wrong! should be BASE_EID
+        );
+
+        vm.deal(address(ethSettler), 1 wei);
+        vm.prank(address(ethSettler));
+        lz.send{ value: 1 wei }(_params(BASE_EID, _addrToBytes32(address(baseSettler)), payload), payable(address(this)));
+
+        vm.chainId(uint256(BASE_EID));
+        vm.expectRevert(IntentSettler.ChainMismatch.selector);
+        lz.deliverNext();
+    }
+
+    /// @notice **R-17** — `_handleConfirm` must validate that the CONFIRM
+    ///         came from the chain the source intent was destined for. A
+    ///         compromised peer at any other EID could otherwise fabricate
+    ///         a CONFIRM and steal source-side escrow in Phase 2+ multi-chain.
+    function testLz_rejectsConfirmFromWrongSourceChain() public {
+        // Alice submits on Eth, transitions to Matched.
+        bytes32 aliceHash = _submitAlice(80);
+        vm.chainId(uint256(ETH_EID));
+        ethSettler.executeMatching{ value: 1 wei }(aliceHash, bytes32(uint256(0xCAFE)));
+
+        // Drop the legit EXECUTE_MATCH so we can manufacture a malicious CONFIRM.
+        lz.dropNext();
+
+        // Add a "rogue" peer at EID 99 and register `address(this)` there so
+        // the mock identifies our test as the EID-99 sender.
+        uint32 rogueEid = 99;
+        ethSettler.setPeer(rogueEid, _addrToBytes32(address(this)));
+        lz.registerOApp(rogueEid, address(this));
+
+        // Hand-craft a CONFIRM as if it came from chain 99 (not BASE_EID where
+        // alice's intent is destined).
+        bytes memory payload = abi.encode(uint8(2), uint8(1), aliceHash, address(0xEEE));
+        vm.deal(address(this), 1 wei);
+        lz.send{ value: 1 wei }(_params(ETH_EID, _addrToBytes32(address(ethSettler)), payload), payable(address(this)));
+
+        vm.chainId(uint256(ETH_EID));
+        vm.expectRevert(); // WrongSourceEidForIntent
+        lz.deliverNext();
+
+        // Alice's intent untouched — the rogue CONFIRM was rejected.
+        assertEq(uint256(ethSettler.intentStates(aliceHash)), uint256(IIntentSettler.IntentState.Matched));
+        assertEq(address(ethSettler).balance, 1 ether, "alice's escrow intact");
+    }
+
+    // -----------------------------------------------------------------------
+    // Operator pre-fund / user-escrow segregation (Concern B)
+    // -----------------------------------------------------------------------
+
+    /// @notice Return-leg LZ fee MUST come from operator-pre-funded excess,
+    ///         never from outstanding user ETH escrow. With Base's pre-fund
+    ///         drained but a user's ETH still escrowed, the CONFIRM send
+    ///         reverts cleanly; the user's escrow stays intact.
+    function testLz_returnLegFeeNeverDebitsUserEscrow() public {
+        // Submit a third-party Carol-on-Base intent so Base is holding ETH
+        // escrow when an EXECUTE_MATCH for Bob arrives.
+        address carol = address(0xCA01);
+        vm.chainId(uint256(BASE_EID));
+        vm.deal(carol, 5 ether);
+        IIntentSettler.Intent memory carolIntent = IIntentSettler.Intent({
+            sourceChainId: uint256(BASE_EID),
+            sourceToken: address(0),
+            sourceAmount: 2 ether,
+            destChainId: uint256(ETH_EID),
+            destToken: address(0xCAFE),
+            minDestAmount: 1,
+            user: carol,
+            refundTo: address(0),
+            deadline: block.timestamp + 1 days,
+            nonce: 81
+        });
+        vm.prank(carol);
+        baseSettler.submitIntent{ value: 2 ether }(carolIntent);
+        assertEq(baseSettler.totalEthEscrow(), 2 ether);
+
+        // Drain Base's operator pre-fund so the only ETH on Base is Carol's escrow.
+        baseSettler.withdrawOperatorFunds(payable(address(this)), 10 wei);
+        assertEq(address(baseSettler).balance, 2 ether, "only carol's escrow remains");
+
+        // Now run a normal Alice/Bob flow that requires Base to send a CONFIRM.
+        bytes32 aliceHash = _submitAlice(82);
+        bytes32 bobHash = _submitBob(_bobIntent(82));
+
+        vm.chainId(uint256(ETH_EID));
+        ethSettler.executeMatching{ value: 1 wei }(aliceHash, bobHash);
+
+        // Delivery to Base attempts to send CONFIRM, but the operator excess
+        // is zero. `_handleExecuteMatch` reverts with InsufficientLzFee
+        // (user escrow is the floor; it is never debited).
+        vm.chainId(uint256(BASE_EID));
+        vm.expectRevert(); // InsufficientLzFee
+        lz.deliverNext();
+
+        // Critical: Carol's escrow is intact.
+        assertEq(address(baseSettler).balance, 2 ether, "carol's escrow untouched");
+        assertEq(baseSettler.totalEthEscrow(), 2 ether);
+    }
+
+    function testWithdraw_onlyOwner() public {
+        vm.deal(address(baseSettler), 100 wei);
+        vm.prank(address(0xBEEF));
+        vm.expectRevert(); // Ownable: caller is not the owner
+        baseSettler.withdrawOperatorFunds(payable(address(this)), 1 wei);
+    }
+
+    /// @notice `operatorBalance` must report `address(this).balance - totalEthEscrow`
+    ///         and stay correct as escrow + operator funds change.
+    function testOperatorBalance_tracksExcess() public {
+        // Fresh settler: 10 wei pre-fund from setUp on baseSettler, 0 on eth.
+        assertEq(ethSettler.operatorBalance(), 0);
+
+        // Add operator pre-fund directly.
+        vm.deal(address(ethSettler), 100 wei);
+        assertEq(ethSettler.operatorBalance(), 100 wei);
+
+        // User submits a 1 ETH intent — totalEthEscrow goes up, operatorBalance unchanged.
+        bytes32 aliceHash = _submitAlice(95);
+        aliceHash; // silence
+        assertEq(ethSettler.totalEthEscrow(), 1 ether);
+        assertEq(ethSettler.operatorBalance(), 100 wei);
+
+        // Withdraw all operator funds — operatorBalance goes to zero, escrow untouched.
+        ethSettler.withdrawOperatorFunds(payable(address(this)), 100 wei);
+        assertEq(ethSettler.operatorBalance(), 0);
+        assertEq(ethSettler.totalEthEscrow(), 1 ether);
+        assertEq(address(ethSettler).balance, 1 ether);
+    }
+
+    function testWithdraw_revertsIfWouldDipIntoEscrow() public {
+        // Add 1 ETH user escrow on Eth.
+        bytes32 aliceHash = _submitAlice(90);
+        aliceHash; // silence
+
+        // Eth has 1 ether (alice) + 0 operator (no pre-fund here). Withdrawing
+        // any amount must revert.
+        vm.expectRevert();
+        ethSettler.withdrawOperatorFunds(payable(address(this)), 1 wei);
+
+        // Add operator funds, withdraw exactly that amount succeeds.
+        vm.deal(address(ethSettler), address(ethSettler).balance + 5 wei);
+        ethSettler.withdrawOperatorFunds(payable(address(this)), 5 wei);
+
+        // Withdrawing more than excess reverts again.
+        vm.expectRevert();
+        ethSettler.withdrawOperatorFunds(payable(address(this)), 1 wei);
     }
 
     receive() external payable { }

@@ -103,7 +103,7 @@ contract IntentSettlerSolverTest is Test {
         // simulate this by having the backend call executeMatching directly
         // from the Auctioning state (we don't need to actually submit on
         // Base — the local-side validation is what matters for this test).
-        settler.executeMatching{ value: 1 wei }(hash, bytes32(uint256(0xBEEF)), 2410e6, 1 ether);
+        settler.executeMatching{ value: 1 wei }(hash, bytes32(uint256(0xBEEF)));
 
         assertEq(uint256(settler.intentStates(hash)), uint256(IIntentSettler.IntentState.Matched));
     }

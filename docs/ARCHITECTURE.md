@@ -163,6 +163,8 @@ function findMatch(intent: Intent): Intent | null {
 - Not expired
 - Both parties still have valid balance/allowance
 
+> **Trust boundary:** the matcher's filtering above is an **efficiency optimization**, not a security boundary. The destination contract independently enforces token compatibility, chain compatibility, and both sides' `minDestAmount` against the source-side parameters carried in the LayerZero payload (sourced from the source contract's own storage). A buggy or malicious matcher cannot cause a settlement that violates either user's signed `minDestAmount` or `destToken` — at worst it can submit a doomed `executeMatching` call, after which the source intent is recoverable via `refundIfLzTimeout`. See [Stage 3 final review § R-16](STAGE_3_FINAL_REVIEW.md).
+
 ### Solver Auction
 
 **Triggered when:** No direct match found
@@ -232,19 +234,16 @@ contract IntentSettler is IIntentSettler, EIP712, ReentrancyGuard {
     event IntentSettled(bytes32 indexed intentHash, address indexed recipient, uint256 amount);
     event IntentRefunded(bytes32 indexed intentHash, address indexed recipient, uint256 amount);
 
-    // Core functions — `executeMatching` accepts price constraints from the
-    // matcher backend so the contract can validate symmetry on-chain even
-    // though the remote intent lives on the other chain.
+    // Core functions — `executeMatching` takes ONLY the two intent hashes.
+    // Token + chain + amount validation happens on the destination chain
+    // using authoritative source-side parameters carried in the LayerZero
+    // payload. The matcher cannot bypass `minDestAmount` or `destToken`
+    // because there is no caller-supplied price field.
     function submitIntent(Intent calldata intent) external payable returns (bytes32);
     function cancelIntent(bytes32 intentHash) external;
-    function executeMatching(
-        bytes32 localHash,
-        bytes32 remoteHash,
-        uint256 remoteSourceAmount,
-        uint256 remoteMinDestAmount
-    ) external payable;
+    function executeMatching(bytes32 localHash, bytes32 remoteHash) external payable;
     function openAuction(bytes32 intentHash) external;
-    function refundIfLzTimeout(bytes32 intentHash) external; // Stage 2
+    function refundIfLzTimeout(bytes32 intentHash) external;
 }
 ```
 

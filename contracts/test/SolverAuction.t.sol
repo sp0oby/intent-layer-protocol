@@ -232,6 +232,31 @@ contract SolverAuctionTest is Test {
         auction.executeWinningProposal(INTENT_HASH);
     }
 
+    /// @notice `getProposals` must return every submitted bid in submission
+    ///         order, in a single call (frontend convenience).
+    function testGetProposals_returnsAllInOrder() public {
+        _openWindow(60);
+        bytes memory sigA = _sign(solverAPk, INTENT_HASH, 2400e6, 30);
+        bytes memory sigB = _sign(solverBPk, INTENT_HASH, 2450e6, 25);
+
+        vm.prank(solverA);
+        auction.submitProposal(INTENT_HASH, 2400e6, 30, sigA);
+        vm.prank(solverB);
+        auction.submitProposal(INTENT_HASH, 2450e6, 25, sigB);
+
+        SolverAuction.SolverProposal[] memory all = auction.getProposals(INTENT_HASH);
+        assertEq(all.length, 2);
+        assertEq(all[0].solver, solverA);
+        assertEq(all[0].proposedOutputAmount, 2400e6);
+        assertEq(all[1].solver, solverB);
+        assertEq(all[1].proposedOutputAmount, 2450e6);
+    }
+
+    function testGetProposals_emptyForUnknownIntent() public view {
+        SolverAuction.SolverProposal[] memory all = auction.getProposals(keccak256("nope"));
+        assertEq(all.length, 0);
+    }
+
     function testExecuteWinningProposal_revertsWhileOpen() public {
         _openWindow(60);
         bytes memory sigA = _sign(solverAPk, INTENT_HASH, 2400e6, 30);

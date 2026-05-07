@@ -95,7 +95,18 @@ contract IntentSettler is IIntentSettler, OApp, EIP712, ReentrancyGuard {
     ///         contract.
     ISolverAuction public solverAuction;
 
+    /// @notice Sum of all native ETH currently held in escrow on behalf of
+    ///         users. Incremented in `submitIntent` for ETH intents; decremented
+    ///         in `_release` whenever ETH leaves the contract for a user.
+    /// @dev    Enforces the invariant `address(this).balance >= totalEthEscrow`.
+    ///         `_payNative` and `withdrawOperatorFunds` may only draw from the
+    ///         excess (`address(this).balance - totalEthEscrow`), so user
+    ///         escrows can never be spent on LayerZero fees or operator
+    ///         withdrawals.
+    uint256 public totalEthEscrow;
+
     event SolverAuctionSet(address indexed solverAuction);
+    event OperatorFundsWithdrawn(address indexed to, uint256 amount);
 
     // -----------------------------------------------------------------------
     // Errors
@@ -115,6 +126,9 @@ contract IntentSettler is IIntentSettler, OApp, EIP712, ReentrancyGuard {
     error AuctionDelayNotElapsed();
     error LocalIntentNotOnThisChain();
     error PriceConstraintViolated();
+    error TokenMismatch();
+    error AmountBelowMinimum();
+    error ChainMismatch();
     error AlreadySettled();
     error LzTimeoutNotElapsed();
     error UnknownMessageType(uint8 msgType);
@@ -122,6 +136,7 @@ contract IntentSettler is IIntentSettler, OApp, EIP712, ReentrancyGuard {
     error LzEidUnknownForChain(uint256 chainId);
     error InsufficientLzFee(uint256 sent, uint256 required);
     error WrongSourceEidForIntent(uint32 srcEid, uint32 expectedEid);
+    error ExceedsOperatorBalance(uint256 requested, uint256 available);
 
     // -----------------------------------------------------------------------
     // Constructor
@@ -173,6 +188,9 @@ contract IntentSettler is IIntentSettler, OApp, EIP712, ReentrancyGuard {
 
         if (intent.sourceToken == address(0)) {
             if (msg.value != intent.sourceAmount) revert EthAmountMismatch();
+            // Track the escrow obligation so `_payNative` and
+            // `withdrawOperatorFunds` cannot dip into user funds.
+            totalEthEscrow += intent.sourceAmount;
         } else {
             if (msg.value != 0) revert EthNotAcceptedForErc20();
             IERC20(intent.sourceToken).safeTransferFrom(msg.sender, address(this), intent.sourceAmount);
@@ -209,20 +227,15 @@ contract IntentSettler is IIntentSettler, OApp, EIP712, ReentrancyGuard {
     /// @dev `msg.value` is forwarded to LayerZero as the message fee. The
     ///      caller (typically the matcher backend) must include enough native
     ///      currency for the destination delivery — quote via `quoteMatching`.
-    function executeMatching(
-        bytes32 localHash,
-        bytes32 remoteHash,
-        uint256 remoteSourceAmount,
-        uint256 remoteMinDestAmount
-    ) external payable override nonReentrant {
+    ///      The price/token compatibility check happens on the destination
+    ///      chain using authoritative source-side data carried in the LZ
+    ///      payload — see `_handleExecuteMatch` and `_buildExecuteMatchPayload`.
+    function executeMatching(bytes32 localHash, bytes32 remoteHash) external payable override nonReentrant {
         IntentMeta memory meta = _meta[localHash];
 
         uint256 localSourceChainId = intents[localHash].sourceChainId;
         uint256 localDeadline = intents[localHash].deadline;
-        uint256 localSourceAmount = intents[localHash].sourceAmount;
-        uint256 localMinDestAmount = intents[localHash].minDestAmount;
         uint256 localDestChainId = intents[localHash].destChainId;
-        address localUser = intents[localHash].user;
 
         if (localSourceChainId != block.chainid) revert LocalIntentNotOnThisChain();
         // Accept both Pending (P2P-matched directly) and Auctioning (a solver
@@ -232,8 +245,6 @@ contract IntentSettler is IIntentSettler, OApp, EIP712, ReentrancyGuard {
         if (meta.state != IntentState.Pending && meta.state != IntentState.Auctioning) revert InvalidState();
         if (meta.settled) revert AlreadySettled();
         if (localDeadline <= block.timestamp) revert DeadlinePassed();
-        if (localSourceAmount < remoteMinDestAmount) revert PriceConstraintViolated();
-        if (remoteSourceAmount < localMinDestAmount) revert PriceConstraintViolated();
 
         meta.state = IntentState.Matched;
         meta.matchTimestamp = uint64(block.timestamp);
@@ -247,7 +258,7 @@ contract IntentSettler is IIntentSettler, OApp, EIP712, ReentrancyGuard {
         uint32 dstEid = chainRegistry.lzEidForChain(localDestChainId);
         if (dstEid == 0) revert LzEidUnknownForChain(localDestChainId);
 
-        bytes memory payload = abi.encode(MSG_EXECUTE_MATCH, MSG_VERSION, localHash, remoteHash, localUser);
+        bytes memory payload = _buildExecuteMatchPayload(localHash, remoteHash);
 
         // Forward msg.value as the LZ native fee. Empty options are fine for the
         // mock endpoint; production deploys will configure real executor options.
@@ -255,15 +266,36 @@ contract IntentSettler is IIntentSettler, OApp, EIP712, ReentrancyGuard {
     }
 
     /// @notice Quote the native fee required for `executeMatching` to succeed.
-    /// @dev Reads `localUser` from storage so the quoted payload byte-for-byte
-    ///      matches what `executeMatching` will actually send. Callers must
-    ///      attach at least this much `msg.value`; LayerZero refunds any excess.
+    /// @dev Reads the source-side intent from storage so the quoted payload
+    ///      byte-for-byte matches what `executeMatching` will actually send.
+    ///      Callers must attach at least this much `msg.value`; LayerZero
+    ///      refunds any excess.
     function quoteMatching(bytes32 localHash, bytes32 remoteHash) external view returns (MessagingFee memory) {
         uint256 destChainId = intents[localHash].destChainId;
         uint32 dstEid = chainRegistry.lzEidForChain(destChainId);
-        address localUser = intents[localHash].user;
-        bytes memory payload = abi.encode(MSG_EXECUTE_MATCH, MSG_VERSION, localHash, remoteHash, localUser);
+        bytes memory payload = _buildExecuteMatchPayload(localHash, remoteHash);
         return _quote(dstEid, payload, "", false);
+    }
+
+    /// @dev Encode the authoritative source-side parameters of the local intent
+    ///      into the EXECUTE_MATCH payload. The destination uses these (along
+    ///      with its own stored copy of the remote intent) to enforce the
+    ///      cross-chain match: token compatibility, chain compatibility, and
+    ///      both sides' `minDestAmount`. Because every field is read from this
+    ///      contract's own storage, the matcher cannot lie about price/tokens.
+    function _buildExecuteMatchPayload(bytes32 localHash, bytes32 remoteHash) internal view returns (bytes memory) {
+        return abi.encode(
+            MSG_EXECUTE_MATCH,
+            MSG_VERSION,
+            localHash,
+            remoteHash,
+            intents[localHash].user,
+            intents[localHash].sourceToken,
+            intents[localHash].sourceAmount,
+            intents[localHash].destToken,
+            intents[localHash].minDestAmount,
+            intents[localHash].destChainId
+        );
     }
 
     /// @inheritdoc IIntentSettler
@@ -303,9 +335,11 @@ contract IntentSettler is IIntentSettler, OApp, EIP712, ReentrancyGuard {
 
     /// @inheritdoc IIntentSettler
     /// @dev Recover funds from a `Matched` intent whose LayerZero confirmation
-    ///      never arrived. The 30-minute window is intentionally longer than
-    ///      LayerZero's expected 3–5 minute settlement so users do not
-    ///      receive spurious refunds during normal latency.
+    ///      never arrived. The 6-hour `LZ_TIMEOUT` window is intentionally
+    ///      longer than LayerZero's expected 3–5 minute settlement so users
+    ///      do not receive spurious refunds during normal latency, and is
+    ///      sized to cover almost every realistic executor recovery scenario
+    ///      (see Stage 3 final review § R-06).
     function refundIfLzTimeout(bytes32 intentHash) external override nonReentrant {
         IntentMeta memory meta = _meta[intentHash];
         if (meta.state != IntentState.Matched) revert InvalidState();
@@ -368,60 +402,133 @@ contract IntentSettler is IIntentSettler, OApp, EIP712, ReentrancyGuard {
         if (msgType == MSG_EXECUTE_MATCH) {
             _handleExecuteMatch(_origin, _message);
         } else if (msgType == MSG_CONFIRM) {
-            _handleConfirm(_message);
+            _handleConfirm(_origin, _message);
         } else {
             revert UnknownMessageType(msgType);
         }
     }
 
-    /// @dev Destination-chain handler. Releases local escrow to the source
-    ///      user and sends a CONFIRM back so the source chain can settle.
-    function _handleExecuteMatch(Origin calldata _origin, bytes calldata _message) internal {
-        (,, bytes32 sourceHash, bytes32 destHash, address sourceUser) =
-            abi.decode(_message, (uint8, uint8, bytes32, bytes32, address));
+    /// @dev In-memory decoding of the EXECUTE_MATCH payload. Used to keep the
+    ///      handler under Solidity's 16-slot stack limit while still passing
+    ///      every validated field through one function.
+    struct ExecuteMatchPayload {
+        bytes32 sourceHash;
+        bytes32 destHash;
+        address sourceUser;
+        address sourceSourceToken;
+        uint256 sourceSourceAmount;
+        address sourceDestToken;
+        uint256 sourceMinDestAmount;
+        uint256 sourceDestChainId;
+    }
 
-        IntentMeta memory meta = _meta[destHash];
-        if (meta.state != IntentState.Pending) revert InvalidState();
-        if (meta.settled) revert AlreadySettled();
-        if (intents[destHash].deadline <= block.timestamp) revert DeadlinePassed();
+    function _decodeExecuteMatch(bytes calldata _message) internal pure returns (ExecuteMatchPayload memory p) {
+        (
+            ,
+            ,
+            p.sourceHash,
+            p.destHash,
+            p.sourceUser,
+            p.sourceSourceToken,
+            p.sourceSourceAmount,
+            p.sourceDestToken,
+            p.sourceMinDestAmount,
+            p.sourceDestChainId
+        ) = abi.decode(
+            _message, (uint8, uint8, bytes32, bytes32, address, address, uint256, address, uint256, uint256)
+        );
+    }
 
-        // Defense-in-depth: enforce that the LayerZero source EID corresponds
-        // to the chain the local intent was destined for. The OApp peer check
-        // already proves the message came from a trusted contract; this check
-        // additionally proves it came from the *right* trusted chain — matters
-        // when more than one corridor is enabled (Phase 2+ multi-chain).
-        uint32 expectedSrcEid = chainRegistry.lzEidForChain(intents[destHash].destChainId);
+    /// @dev Validate the cross-chain match using only trusted data. Reverts
+    ///      with a typed error on any inconsistency. Split out to keep
+    ///      `_handleExecuteMatch` under the stack-depth limit.
+    function _validateExecuteMatch(Origin calldata _origin, ExecuteMatchPayload memory p) internal view {
+        Intent storage destIntent = intents[p.destHash];
+
+        // R-01: source EID corresponds to the chain the local intent was
+        // destined for. The OApp peer check proves the message came from a
+        // trusted contract; this proves it came from the right trusted chain.
+        uint32 expectedSrcEid = chainRegistry.lzEidForChain(destIntent.destChainId);
         if (expectedSrcEid != _origin.srcEid) revert WrongSourceEidForIntent(_origin.srcEid, expectedSrcEid);
 
+        // Defense-in-depth against source-side registry misconfiguration: the
+        // source claims its destChainId; we verify that's actually us.
+        if (p.sourceDestChainId != block.chainid) revert ChainMismatch();
+
+        // Cross-chain token compatibility — alice's destToken must equal what
+        // bob is offering (his sourceToken), and vice-versa. Without this,
+        // a malicious matcher could pair tokens that don't agree.
+        if (destIntent.sourceToken != p.sourceDestToken) revert TokenMismatch();
+        if (destIntent.destToken != p.sourceSourceToken) revert TokenMismatch();
+
+        // Cross-chain amount compatibility, enforced with TRUSTED data on
+        // both sides — bob's actual stored sourceAmount must satisfy alice's
+        // minDestAmount (carried in the LZ payload from alice's storage),
+        // and alice's actual sourceAmount must satisfy bob's stored minDestAmount.
+        if (destIntent.sourceAmount < p.sourceMinDestAmount) revert AmountBelowMinimum();
+        if (p.sourceSourceAmount < destIntent.minDestAmount) revert AmountBelowMinimum();
+    }
+
+    /// @dev Destination-chain handler. Validates the cross-chain match using
+    ///      only trusted data (this chain's stored intent + peer-authenticated
+    ///      LayerZero payload), releases local escrow to the source user, and
+    ///      sends a CONFIRM back so the source chain can settle. The matcher
+    ///      supplies no security-critical fields — every validated value
+    ///      below comes from either local storage or the source contract's
+    ///      own storage (carried in the peer-trusted LZ payload).
+    function _handleExecuteMatch(Origin calldata _origin, bytes calldata _message) internal {
+        ExecuteMatchPayload memory p = _decodeExecuteMatch(_message);
+
+        IntentMeta memory meta = _meta[p.destHash];
+        if (meta.state != IntentState.Pending) revert InvalidState();
+        if (meta.settled) revert AlreadySettled();
+        if (intents[p.destHash].deadline <= block.timestamp) revert DeadlinePassed();
+
+        _validateExecuteMatch(_origin, p);
+
         // Settle the local intent: state → Settled, release tokens to source user.
-        address destToken = intents[destHash].sourceToken;
-        uint256 destAmount = intents[destHash].sourceAmount;
-        address destUser = intents[destHash].user;
+        address destToken = intents[p.destHash].sourceToken;
+        uint256 destAmount = intents[p.destHash].sourceAmount;
+        address destUser = intents[p.destHash].user;
 
         meta.state = IntentState.Settled;
         meta.settled = true;
-        _meta[destHash] = meta;
+        _meta[p.destHash] = meta;
 
-        _release(destToken, sourceUser, destAmount);
-        emit IntentSettled(destHash, sourceUser, destAmount);
+        _release(destToken, p.sourceUser, destAmount);
+        emit IntentSettled(p.destHash, p.sourceUser, destAmount);
 
         // Send CONFIRM back to the source chain. The dest user (read from our
         // own storage — trusted) is the recipient on the source side.
-        bytes memory reply = abi.encode(MSG_CONFIRM, MSG_VERSION, sourceHash, destUser);
+        bytes memory reply = abi.encode(MSG_CONFIRM, MSG_VERSION, p.sourceHash, destUser);
         MessagingFee memory fee = _quote(_origin.srcEid, reply, "", false);
-        if (address(this).balance < fee.nativeFee) revert InsufficientLzFee(address(this).balance, fee.nativeFee);
+        // Concern B: only the operator-pre-funded excess (balance above
+        // outstanding ETH escrows) is available for return-leg LZ fees.
+        // Reverts cleanly if the operator failed to top up; user funds stay
+        // intact and the intent recovers via `refundIfLzTimeout`.
+        uint256 available = address(this).balance - totalEthEscrow;
+        if (available < fee.nativeFee) revert InsufficientLzFee(available, fee.nativeFee);
 
         _lzSend(_origin.srcEid, reply, "", fee, payable(address(this)));
     }
 
-    /// @dev Source-chain handler. Releases local escrow to the dest user
-    ///      and finalises the matched intent as `Settled`.
-    function _handleConfirm(bytes calldata _message) internal {
+    /// @dev Source-chain handler. Validates the CONFIRM came from the
+    ///      destination chain the local intent expected, releases local
+    ///      escrow to the dest user, and finalises as `Settled`.
+    function _handleConfirm(Origin calldata _origin, bytes calldata _message) internal {
         (,, bytes32 sourceHash, address destUser) = abi.decode(_message, (uint8, uint8, bytes32, address));
 
         IntentMeta memory meta = _meta[sourceHash];
         if (meta.state != IntentState.Matched) revert InvalidState();
         if (meta.settled) revert AlreadySettled();
+
+        // R-17: same registry-based srcEid validation that R-01 added to
+        // EXECUTE_MATCH, applied to the return leg. Without this, a
+        // compromised peer at any other EID could fabricate a CONFIRM for a
+        // local intent that was never destined for that chain and steal the
+        // source-side escrow. Covers Phase 2+ multi-chain attack surface.
+        uint32 expectedSrcEid = chainRegistry.lzEidForChain(intents[sourceHash].destChainId);
+        if (expectedSrcEid != _origin.srcEid) revert WrongSourceEidForIntent(_origin.srcEid, expectedSrcEid);
 
         address sourceToken = intents[sourceHash].sourceToken;
         uint256 sourceAmount = intents[sourceHash].sourceAmount;
@@ -462,30 +569,76 @@ contract IntentSettler is IIntentSettler, OApp, EIP712, ReentrancyGuard {
         return _meta[intentHash];
     }
 
+    /// @notice Compute the canonical EIP-712 hash that `submitIntent` would
+    ///         store for `intent`. Useful for the frontend to display the
+    ///         hash before submission, pre-check duplicates, or correlate
+    ///         with the off-chain matcher's database.
+    /// @dev    Pure-view: no state read except the EIP-712 domain (chainId
+    ///         + this contract address). Mirrors `submitIntent` exactly.
+    function hashIntent(Intent calldata intent) external view returns (bytes32) {
+        return _hashTypedDataV4(IntentHash.structHash(intent));
+    }
+
+    /// @notice Native balance NOT held in user escrow — i.e. the operator's
+    ///         pre-funded buffer for return-leg LayerZero fees plus any
+    ///         direct ETH transfers. The amount safely withdrawable via
+    ///         `withdrawOperatorFunds`.
+    /// @dev    Subtraction never underflows because the protocol invariant
+    ///         `address(this).balance >= totalEthEscrow` is enforced by
+    ///         `_payNative`, `_release`, and `withdrawOperatorFunds`.
+    function operatorBalance() external view returns (uint256) {
+        return address(this).balance - totalEthEscrow;
+    }
+
     // -----------------------------------------------------------------------
     // Internal helpers
     // -----------------------------------------------------------------------
 
     function _release(address token, address to, uint256 amount) internal {
         if (token == address(0)) {
+            // Decrement the escrow ledger before the external call so the
+            // post-call invariant `address(this).balance >= totalEthEscrow`
+            // holds even if `to` reenters. CEI is preserved: state is also
+            // updated by the caller before invoking `_release`.
+            totalEthEscrow -= amount;
             SafeTransfer.safeTransferETH(payable(to), amount);
         } else {
             IERC20(token).safeTransfer(to, amount);
         }
     }
 
+    /// @notice Withdraw native ETH that is NOT held in user escrow. Used by
+    ///         the operator (multisig) to recover pre-funded LayerZero fee
+    ///         buffer or to reclaim any direct ETH transfers. Reverts if the
+    ///         requested amount would dip into outstanding user escrows.
+    /// @dev    Owner-gated. Even with key compromise this cannot drain user
+    ///         funds because of the `totalEthEscrow` floor.
+    function withdrawOperatorFunds(address payable to, uint256 amount) external onlyOwner {
+        uint256 available = address(this).balance - totalEthEscrow;
+        if (amount > available) revert ExceedsOperatorBalance(amount, available);
+        SafeTransfer.safeTransferETH(to, amount);
+        emit OperatorFundsWithdrawn(to, amount);
+    }
+
     /// @notice Accept native ETH from `submitIntent`, LayerZero fee refunds,
     ///         and operator pre-funding (used to pay return-leg LZ fees in
-    ///         `_handleExecuteMatch`). Bare transfers cannot mint state.
+    ///         `_handleExecuteMatch`). Bare transfers cannot mint state and
+    ///         do NOT increment `totalEthEscrow` — only `submitIntent`'s
+    ///         tracked escrow path does. Any plain ETH sent here is therefore
+    ///         operator funds (recoverable via `withdrawOperatorFunds`).
     receive() external payable { }
 
     /// @dev Override OAppSender's strict `msg.value == _nativeFee` check so
     ///      the return-leg `_lzSend` inside `_lzReceive` (where `msg.value == 0`)
     ///      can draw from the contract's pre-funded balance. The user-initiated
     ///      `executeMatching` path still goes through the strict equality check.
+    ///      The pre-funded path requires available operator funds (balance
+    ///      above outstanding ETH escrows) — user escrow is never spent on fees.
     function _payNative(uint256 _nativeFee) internal override returns (uint256) {
         if (msg.value == _nativeFee) return _nativeFee;
-        if (msg.value == 0 && address(this).balance >= _nativeFee) return _nativeFee;
+        if (msg.value == 0 && address(this).balance >= totalEthEscrow + _nativeFee) {
+            return _nativeFee;
+        }
         revert NotEnoughNative(msg.value);
     }
 }

@@ -293,7 +293,7 @@ contract IntentSettlerTest is Test {
         bytes32 hash = settler.submitIntent{ value: 1 ether }(intent);
 
         // Transition to Matched via executeMatching.
-        settler.executeMatching{ value: 1 wei }(hash, bytes32(uint256(0xBEEF)), 200e6, 1 ether);
+        settler.executeMatching{ value: 1 wei }(hash, bytes32(uint256(0xBEEF)));
         assertEq(uint256(settler.intentStates(hash)), uint256(IIntentSettler.IntentState.Matched));
 
         // Cancel must revert — Matched is not in {Pending, Auctioning}.
@@ -391,9 +391,12 @@ contract IntentSettlerTest is Test {
         vm.prank(alice);
         bytes32 hash = settler.submitIntent{ value: 1 ether }(intent);
 
+        // Source-side `executeMatching` is now a thin lifecycle gate — token
+        // and amount validation against the remote intent happen on the
+        // destination chain via the LZ payload (see `_handleExecuteMatch`
+        // tests in IntentSettler.lz.t.sol).
         bytes32 remoteHash = bytes32(uint256(0xBEEF));
-        // Counterpart sends 2500 USDC, demands 1 ETH min.
-        settler.executeMatching{ value: 1 wei }(hash, remoteHash, 2500e6, 1 ether);
+        settler.executeMatching{ value: 1 wei }(hash, remoteHash);
 
         assertEq(uint256(settler.intentStates(hash)), uint256(IIntentSettler.IntentState.Matched));
         assertEq(settler.matchTimestamps(hash), block.timestamp);
@@ -406,19 +409,7 @@ contract IntentSettlerTest is Test {
         // verify the guard fires when the hash is unknown (storage zero).
         bytes32 unknownHash = keccak256("nope");
         vm.expectRevert(IntentSettler.LocalIntentNotOnThisChain.selector);
-        settler.executeMatching(unknownHash, bytes32(0), 1, 1);
-    }
-
-    function testExecuteMatching_revertsIfPriceConstraintFails() public {
-        IIntentSettler.Intent memory intent = _baseIntent(alice, address(0), 1 ether, 41);
-        intent.minDestAmount = 2400e6;
-        vm.deal(alice, 5 ether);
-        vm.prank(alice);
-        bytes32 hash = settler.submitIntent{ value: 1 ether }(intent);
-
-        // Counterpart only offers 2300 USDC — below alice's min.
-        vm.expectRevert(IntentSettler.PriceConstraintViolated.selector);
-        settler.executeMatching(hash, bytes32(uint256(1)), 2300e6, 1 ether);
+        settler.executeMatching(unknownHash, bytes32(0));
     }
 
     function testExecuteMatching_revertsIfDeadlinePassed() public {
@@ -430,7 +421,7 @@ contract IntentSettlerTest is Test {
 
         vm.warp(block.timestamp + 301);
         vm.expectRevert(IntentSettler.DeadlinePassed.selector);
-        settler.executeMatching(hash, bytes32(uint256(1)), 2500e6, 1 ether);
+        settler.executeMatching(hash, bytes32(uint256(1)));
     }
 
     function testExecuteMatching_revertsIfAlreadyMatched() public {
@@ -440,9 +431,9 @@ contract IntentSettlerTest is Test {
         vm.prank(alice);
         bytes32 hash = settler.submitIntent{ value: 1 ether }(intent);
 
-        settler.executeMatching{ value: 1 wei }(hash, bytes32(uint256(1)), 2500e6, 1 ether);
+        settler.executeMatching{ value: 1 wei }(hash, bytes32(uint256(1)));
         vm.expectRevert(IntentSettler.InvalidState.selector);
-        settler.executeMatching(hash, bytes32(uint256(2)), 2500e6, 1 ether);
+        settler.executeMatching(hash, bytes32(uint256(2)));
     }
 
     function testRefundIfLzTimeout_revertsIfNotMatched() public {
@@ -458,7 +449,7 @@ contract IntentSettlerTest is Test {
         vm.prank(alice);
         bytes32 hash = settler.submitIntent{ value: 1 ether }(intent);
 
-        settler.executeMatching{ value: 1 wei }(hash, bytes32(uint256(0xBEEF)), 200e6, 1 ether);
+        settler.executeMatching{ value: 1 wei }(hash, bytes32(uint256(0xBEEF)));
         vm.expectRevert(IntentSettler.LzTimeoutNotElapsed.selector);
         settler.refundIfLzTimeout(hash);
     }
@@ -471,7 +462,7 @@ contract IntentSettlerTest is Test {
         vm.prank(alice);
         bytes32 hash = settler.submitIntent{ value: 1 ether }(intent);
 
-        settler.executeMatching{ value: 1 wei }(hash, bytes32(uint256(0xBEEF)), 200e6, 1 ether);
+        settler.executeMatching{ value: 1 wei }(hash, bytes32(uint256(0xBEEF)));
         uint256 aliceBalBefore = alice.balance;
 
         // LZ_TIMEOUT = 6 hours
@@ -481,6 +472,7 @@ contract IntentSettlerTest is Test {
         assertEq(uint256(settler.intentStates(hash)), uint256(IIntentSettler.IntentState.Refunded));
         assertEq(alice.balance, aliceBalBefore + 1 ether, "alice refunded");
         assertTrue(settler.settled(hash));
+        assertEq(settler.totalEthEscrow(), 0, "escrow drained on refund");
     }
 
     function testRefundIfLzTimeout_revertsIfAlreadySettled() public {
@@ -491,7 +483,7 @@ contract IntentSettlerTest is Test {
         vm.prank(alice);
         bytes32 hash = settler.submitIntent{ value: 1 ether }(intent);
 
-        settler.executeMatching{ value: 1 wei }(hash, bytes32(uint256(0xBEEF)), 200e6, 1 ether);
+        settler.executeMatching{ value: 1 wei }(hash, bytes32(uint256(0xBEEF)));
         vm.warp(block.timestamp + 6 hours + 1);
         settler.refundIfLzTimeout(hash);
 

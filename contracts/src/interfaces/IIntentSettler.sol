@@ -107,16 +107,17 @@ interface IIntentSettler {
     function cancelIntent(bytes32 intentHash) external;
 
     /// @notice Trigger P2P matching for the local intent (`localHash` must have
-    ///         `sourceChainId == block.chainid`). The remote intent is a cross-chain
-    ///         reference validated by the LayerZero delivery on the destination chain.
-    /// @dev Permissionless. Callers (typically the matcher backend) forward LayerZero
-    ///      fees in `msg.value`; the actual `_lzSend` is wired in Stage 2.
-    function executeMatching(
-        bytes32 localHash,
-        bytes32 remoteHash,
-        uint256 remoteSourceAmount,
-        uint256 remoteMinDestAmount
-    ) external payable;
+    ///         `sourceChainId == block.chainid`). The remote intent is referenced
+    ///         only by hash; the destination chain validates the match against
+    ///         its own stored copy of the remote intent using authoritative
+    ///         source-side parameters carried in the LayerZero payload.
+    /// @dev Permissionless. Callers (typically the matcher backend) forward
+    ///      LayerZero fees in `msg.value`. The destination performs the
+    ///      cross-chain match check (token compatibility, chain compatibility,
+    ///      mutual amount minimums) using only trusted data — there is no
+    ///      caller-supplied price field, so a malicious matcher cannot bypass
+    ///      the user's `minDestAmount` or `destToken` preferences.
+    function executeMatching(bytes32 localHash, bytes32 remoteHash) external payable;
 
     /// @notice Open the solver auction for an intent that did not find a P2P match.
     /// @dev Permissionless after `AUCTION_DELAY` (30s) since submission.

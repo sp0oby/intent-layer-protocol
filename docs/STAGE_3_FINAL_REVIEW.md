@@ -10,7 +10,7 @@
 
 The user requested a comprehensive re-read of every project document and a deeper review of the contracts before moving from on-chain (Stages 0–3) to backend (Stage 4). This is that review. It catches issues that the per-stage audits missed, and locks the on-chain protocol so backend work can build on a stable foundation.
 
-**Outcome:** 5 findings, all addressed. **0 medium+ Slither findings** across 41 contracts. **87 tests pass** including ~384k random invariant calls.
+**Outcome:** 5 first-pass findings (R-01 to R-05) closed initially. A follow-up security pass surfaced and closed **3 further findings (R-16, R-17, R-18)** — see the "Follow-up security pass" section at the bottom of this document. **0 medium+ Slither findings** across 41 contracts. **96 tests pass** including ~768k random invariant calls.
 
 ---
 
@@ -173,7 +173,7 @@ This is the part of the review I had skipped before. Going through every doc to 
 
 | Item | Status |
 |---|---|
-| Timeout: refund after LZ failure | ✅ `LZ_TIMEOUT = 30 minutes`, doc-spec said 5 min — we use 30 min as a safety buffer above expected 3-5 min settlement (documented) |
+| Timeout: refund after LZ failure | ✅ `LZ_TIMEOUT = 6 hours` (raised from 30 min as part of R-06 mitigation — covers nearly every realistic executor recovery scenario) |
 | Manual recovery (admin function) | **Replaced** with self-serve `refundIfLzTimeout` — no admin trust required (better than spec) |
 | Message redundancy | Not implemented — single message; LZ handles its own delivery guarantees |
 | Insurance pool | Phase 2 |
@@ -380,11 +380,98 @@ I have re-read every project document and re-reviewed every contract. I confirm:
 
 ---
 
+## Follow-up security pass
+
+A follow-up review, scoped explicitly to **security of user funds and exploit avoidance**, surfaced three additional findings that the first pass had treated as documented-but-accepted matcher-trust assumptions. The follow-up treated them as production blockers and closed all three.
+
+### R-16 — Source-side price/token check was matcher-trusted; could be bypassed  ⚠️ **Medium → Fixed**
+
+**Where:** `IntentSettler.executeMatching` and `_handleExecuteMatch`
+
+#### The vulnerability
+Pre-fix, `executeMatching(localHash, remoteHash, remoteSourceAmount, remoteMinDestAmount)` accepted price parameters from the matcher (anyone — `executeMatching` is permissionless per R-07). The source-side checks `localSourceAmount >= remoteMinDestAmount` and `remoteSourceAmount >= localMinDestAmount` evaluated against **caller-supplied** values; the destination's `_handleExecuteMatch` then released `intents[destHash].sourceAmount` (bob's actual escrow) without re-validating the price against trusted data.
+
+In addition, the destination did **not check token compatibility**: `intents[destHash].sourceToken == aliceDestToken` was never enforced. A malicious matcher could pair Alice (wants USDC, min 2400) with a Bob who escrowed any worthless token in any amount, and Alice's ETH would still leave for Bob's worthless escrow.
+
+#### Fix
+1. `executeMatching` is now `executeMatching(bytes32 localHash, bytes32 remoteHash)` — no caller-supplied price/token fields.
+2. The source contract reads its own intent's `(sourceToken, sourceAmount, destToken, minDestAmount, destChainId)` from storage and packs them into the LayerZero payload (`_buildExecuteMatchPayload`). Because LZ peer-trust authenticates the payload origin, the destination can rely on these as authoritative source-side data.
+3. The destination's `_handleExecuteMatch` now validates:
+   - `intents[destHash].sourceToken == sourceDestToken` (alice's expected destToken == bob's actual sourceToken)
+   - `intents[destHash].destToken == sourceSourceToken` (bob's expected destToken == alice's actual sourceToken)
+   - `intents[destHash].sourceAmount >= sourceMinDestAmount` (bob has enough for alice's minimum)
+   - `sourceSourceAmount >= intents[destHash].minDestAmount` (alice has enough for bob's minimum)
+   - `sourceDestChainId == block.chainid` (defense in depth vs. source-side registry misconfiguration)
+4. Failed validation reverts cleanly with `TokenMismatch` / `AmountBelowMinimum` / `ChainMismatch`. Alice's intent stays at `Matched`; she recovers her escrow via `refundIfLzTimeout` after `LZ_TIMEOUT`. **Funds delayed, never lost.**
+
+#### Verification
+- `testLz_dest_rejectsTokenMismatch` — bob escrows WETH where alice wanted USDC; dest reverts.
+- `testLz_dest_rejectsBobAmountBelowAliceMin` — bob escrows 100 USDC vs. alice's 2400 minimum; dest reverts.
+- `testLz_dest_rejectsAliceAmountBelowBobMin` — alice's 0.1 ETH vs. bob's 1 ETH minimum; dest reverts.
+- `testLz_dest_rejectsWrongChainId` — hand-crafted payload claims wrong destChainId; dest reverts.
+
+### R-17 — `_handleConfirm` was missing the same source-EID validation as R-01  ⚠️ **Medium → Fixed**
+
+**Where:** `IntentSettler._handleConfirm`
+
+#### The vulnerability
+R-01 added `expectedSrcEid = chainRegistry.lzEidForChain(intents[destHash].destChainId); require(expectedSrcEid == _origin.srcEid)` to `_handleExecuteMatch` so a peer trusted at one EID could not impersonate a different chain's settlement. The CONFIRM leg (`_handleConfirm`) had no equivalent check.
+
+In Phase 1 with a single corridor, the OApp peer-set is trivially correct so this is not exploitable. In Phase 2+ multi-chain, a compromised peer at any other EID could fabricate a CONFIRM for an intent whose actual destination was a different chain, and the source would release alice's escrow to whoever the payload named as `destUser`.
+
+#### Fix
+`_handleConfirm` now receives `_origin` and runs the symmetric check:
+
+```solidity
+uint32 expectedSrcEid = chainRegistry.lzEidForChain(intents[sourceHash].destChainId);
+if (expectedSrcEid != _origin.srcEid) revert WrongSourceEidForIntent(_origin.srcEid, expectedSrcEid);
+```
+
+`_lzReceive` was updated to forward `_origin` to both handlers.
+
+#### Verification
+- `testLz_rejectsConfirmFromWrongSourceChain` — adds a rogue peer at EID 99, sends a fabricated CONFIRM for an alice-intent destined for `BASE_EID`, asserts the message reverts and alice's escrow is intact.
+
+### R-18 — Operator pre-fund and user ETH escrow shared the same balance ⚠️ **Medium → Fixed**
+
+**Where:** `IntentSettler._payNative`, `IntentSettler._release`, `IntentSettler.submitIntent`, new `IntentSettler.withdrawOperatorFunds`
+
+#### The vulnerability
+M-05 (Stage 2 audit) accepted the operator-pre-fund pattern with the claim "no funds are lost — only delayed." That claim was subtly weak: the contract's native balance held both operator pre-fund AND user ETH escrows, with no ledger to distinguish them. The pre-fix `_payNative` checked only `address(this).balance >= _nativeFee`, so once operator pre-fund was depleted, every subsequent CONFIRM consumed ~1 wei from the next user's ETH escrow until eventually a refund or settlement reverted with `OutOfFunds`. User funds **could** be drained in tiny increments before the failure mode kicked in.
+
+#### Fix
+1. New storage: `uint256 public totalEthEscrow` — the on-chain ledger of outstanding ETH escrow.
+2. `submitIntent` increments it for ETH intents (after the `EthAmountMismatch` check).
+3. `_release` decrements it before transferring ETH (CEI preserved — caller still updates state before invoking `_release`).
+4. `_payNative` now requires `address(this).balance >= totalEthEscrow + _nativeFee`. User escrow is the floor; only the excess (operator-pre-funded buffer) can pay LayerZero fees.
+5. New owner-only `withdrawOperatorFunds(to, amount)` lets the operator multisig recover excess ETH (return-leg fee buffer top-up correction, accidentally-sent ETH, etc.) without ever dipping into the escrow floor.
+6. `receive()` natspec updated to clarify that any plain ETH transfer is operator funds (recoverable via `withdrawOperatorFunds`), distinct from `submitIntent`'s tracked escrow.
+
+The promise from M-05 — "operator pre-fund failure = funds delayed, not lost" — is now genuinely true.
+
+#### Verification
+- `testLz_returnLegFeeNeverDebitsUserEscrow` — drains operator pre-fund on Base, runs an Alice/Bob match; the EXECUTE_MATCH delivery reverts with `InsufficientLzFee`, Carol's pre-existing 2-ETH escrow is left exactly intact.
+- `testWithdraw_onlyOwner` — non-owner reverts.
+- `testWithdraw_revertsIfWouldDipIntoEscrow` — owner cannot withdraw amounts that would breach the escrow floor.
+- New stateful invariant `invariant_totalEthEscrowFloor` — across 256 runs × ~500 random calls, the contract balance is never observed below `totalEthEscrow`.
+
+### Final state after the follow-up pass
+
+| Check | Result |
+|---|---|
+| `forge build` | ✅ clean (45 contracts) |
+| `forge test` | ✅ **96/96 pass** (~3.5 min, including 6 invariants × 256 runs × 500 calls ≈ 768k random sequences) |
+| `forge fmt --check` | ✅ clean |
+| Slither (medium+) | ✅ **0 findings** across 41 contracts |
+| LZ payload version | `MSG_VERSION = 1` (not bumped — pre-deploy) |
+
+---
+
 ## Document control
 
 | | |
 |:---|:---|
-| **Version** | 1.0 |
+| **Version** | 1.1 |
 | **Last updated** | 2026-05-06 |
-| **Status** | Final review of on-chain protocol — stage gate to Stage 4 |
+| **Status** | Final review + follow-up security pass — stage gate to Stage 4 |
 | **Reviewer** | Internal (maintainer + Claude) |

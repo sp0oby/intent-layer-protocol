@@ -182,6 +182,15 @@ contract SolverAuction is ISolverAuction {
         return _proposals[intentHash][index];
     }
 
+    /// @notice All proposals submitted for `intentHash`, in submission order.
+    ///         Bounded by `MAX_PROPOSALS_PER_INTENT` (50) so the array is
+    ///         always small enough to return safely in a single call.
+    /// @dev    Frontend convenience: replaces N round-trips of
+    ///         (`proposalCount` + N × `proposalAt`) with a single call.
+    function getProposals(bytes32 intentHash) external view returns (SolverProposal[] memory) {
+        return _proposals[intentHash];
+    }
+
     /// @notice The exact 32-byte digest a solver must sign to submit a proposal.
     /// @dev Includes `address(this)` and `block.chainid` so a signature from
     ///      one auction or one chain cannot be replayed on another.

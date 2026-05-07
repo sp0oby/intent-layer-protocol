@@ -43,6 +43,17 @@ contract IntentSettlerInvariantTest is Test {
         assertEq(address(settler).balance, expected, "eth balance must equal outstanding escrow");
     }
 
+    /// @notice The on-chain escrow ledger (`totalEthEscrow`) must equal the
+    ///         handler's high-water expectation, AND the contract's ETH
+    ///         balance must never drop below it. This is the core safety
+    ///         invariant that guarantees user escrow is never debited for
+    ///         operator fees, withdrawals, or any other path.
+    function invariant_totalEthEscrowFloor() public view {
+        uint256 expected = handler.expectedEthEscrow();
+        assertEq(settler.totalEthEscrow(), expected, "ledger must match handler expectation");
+        assertGe(address(settler).balance, settler.totalEthEscrow(), "balance must never dip below escrow floor");
+    }
+
     /// @notice The contract's ERC-20 balance equals the sum of escrow held in
     ///         intents whose state still owes a refund/release.
     function invariant_erc20EscrowAccounting() public view {
@@ -128,10 +139,11 @@ contract IntentSettlerInvariantTest is Test {
     }
 
     /// @notice executeMatching reverts cleanly for any local intent that isn't
-    ///         in the right state, regardless of the price arguments passed.
-    function testFuzz_executeMatchingNeverWorksOnUnknownLocal(bytes32 unknownHash, uint256 a, uint256 b) public {
+    ///         in the right state. The remote intent is referenced only by
+    ///         hash (price/token validation now lives on the destination).
+    function testFuzz_executeMatchingNeverWorksOnUnknownLocal(bytes32 unknownHash, bytes32 remoteHash) public {
         vm.expectRevert(IntentSettler.LocalIntentNotOnThisChain.selector);
-        settler.executeMatching(unknownHash, bytes32(0), a, b);
+        settler.executeMatching(unknownHash, remoteHash);
     }
 
     /// @notice Same nonce can never be used twice by the same user, regardless

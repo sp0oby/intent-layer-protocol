@@ -1,6 +1,6 @@
 # Smart contracts (Foundry)
 
-**Status (as of Stage 3 close):** Phase 1 on-chain protocol is **complete and internally audited**. Escrow, EIP-712 hashing, cross-chain LayerZero V2 messaging, solver auction, and timeout-based recovery are all implemented and tested. Backend (Stage 4), frontend wiring (Stage 5), and testnet deployment (Stage 8) follow.
+**Status (as of Stage 3 close + follow-up security pass):** Phase 1 on-chain protocol is **complete and internally audited**. Escrow, EIP-712 hashing, cross-chain LayerZero V2 messaging, solver auction, and timeout-based recovery are all implemented and tested. The follow-up pass moved match validation (token + chain + amount) onto the destination chain so the matcher cannot bypass user `minDestAmount` / `destToken` (R-16), added the missing CONFIRM-leg source-EID guard (R-17), and segregated user ETH escrow from operator pre-fund so LayerZero fees can never debit user funds (R-18). Backend (Stage 4), frontend wiring (Stage 5), and testnet deployment (Stage 8) follow.
 
 **See also:** [Repository README](../README.md) · [Architecture](../docs/ARCHITECTURE.md) · [MVP specification](../docs/MVP_SPECIFICATION.md) · [Stage 1 audit](../docs/STAGE_1_AUDIT.md) · [Stage 2 audit](../docs/STAGE_2_AUDIT.md) · [Stage 3 audit](../docs/STAGE_3_AUDIT.md) · [Stage 3 final review](../docs/STAGE_3_FINAL_REVIEW.md)
 
@@ -11,7 +11,7 @@
 | File | Status | Notes |
 |------|--------|-------|
 | [`ChainPeerRegistry.sol`](src/ChainPeerRegistry.sol) | ✅ | Per-chain `chainId → LayerZero EID` table + `(source, dest)` route allowlist; owner-gated |
-| [`IntentSettler.sol`](src/IntentSettler.sol) | ✅ | OApp + EIP-712 + ReentrancyGuard. `submitIntent` (escrow), `cancelIntent`, `executeMatching` (with `_lzSend`), `_lzReceive` dispatching `EXECUTE_MATCH`/`CONFIRM`, `refundIfLzTimeout` (6 hr), `openAuction`, `setSolverAuction`. Packed `IntentMeta` storage. |
+| [`IntentSettler.sol`](src/IntentSettler.sol) | ✅ | OApp + EIP-712 + ReentrancyGuard. `submitIntent` (escrow + `totalEthEscrow` ledger), `cancelIntent`, `executeMatching(localHash, remoteHash)` (no matcher-trusted price params), `_lzReceive` dispatching `EXECUTE_MATCH` (token + chain + both-sides amount checked against trusted data) / `CONFIRM` (R-17 source-EID guard), `refundIfLzTimeout` (6 hr), `openAuction`, `setSolverAuction`, `withdrawOperatorFunds` (owner-only, escrow-floor protected). Packed `IntentMeta` storage. |
 | [`SolverAuction.sol`](src/SolverAuction.sol) | ✅ | Settler-gated `setAuctionWindow`, ECDSA-signed proposals over a chain-and-contract-bound digest, deterministic ranking, idempotent winner announcement, double-submit guard, DoS cap |
 | [`interfaces/IIntentSettler.sol`](src/interfaces/IIntentSettler.sol) | ✅ | `Intent` struct (ERC-7683 aligned + `refundTo`), `IntentState` enum (with `Locked` reserved for Phase 2B async settlement), `IntentMeta` packed struct, full event set |
 | [`interfaces/IChainPeerRegistry.sol`](src/interfaces/IChainPeerRegistry.sol) | ✅ | Read interface for the registry |
@@ -24,24 +24,24 @@
 
 | File | Tests | Notes |
 |------|------:|-------|
-| [`IntentSettler.t.sol`](test/IntentSettler.t.sol) | 34 | submit, cancel, openAuction, executeMatching, refundIfLzTimeout |
-| [`IntentSettler.lz.t.sol`](test/IntentSettler.lz.t.sol) | 9 | full cross-chain round-trip via `MockLzEndpoint`, full solver-auction round-trip, dropped-delivery → timeout refund, peer rejection, version/type rejection, source-EID rejection, **explicit asymmetric-loss documentation** |
+| [`IntentSettler.t.sol`](test/IntentSettler.t.sol) | 33 | submit (incl. `totalEthEscrow` tracking), cancel, openAuction, executeMatching (lifecycle gates only), refundIfLzTimeout |
+| [`IntentSettler.lz.t.sol`](test/IntentSettler.lz.t.sol) | 18 | full cross-chain round-trip, full solver-auction round-trip, dropped-delivery → timeout refund, peer rejection, version/type rejection, R-01 source-EID rejection, **explicit asymmetric-loss documentation**, **R-16 dest-side validation (token mismatch + both amount-below-min + wrong chain id)**, **R-17 confirm-leg source-EID rejection**, **R-18 escrow-floor: return-leg fee never debits user escrow + `withdrawOperatorFunds` owner gate + escrow-floor enforcement**, `operatorBalance` view |
 | [`IntentSettler.solver.t.sol`](test/IntentSettler.solver.t.sol) | 5 | `IntentSettler` ↔ `SolverAuction` wiring, gating, executeMatching from Auctioning state |
-| [`IntentSettler.invariant.t.sol`](test/IntentSettler.invariant.t.sol) | 8 | 3 property-fuzz × 256 runs + 5 stateful invariants × 256 runs × ~500 calls ≈ **640k random call sequences** |
-| [`IntentHash.t.sol`](test/IntentHash.t.sol) | 4 | EIP-712 parity (on-chain ↔ off-chain) |
-| [`SolverAuction.t.sol`](test/SolverAuction.t.sol) | 18 | window setup, signed proposals, ranking, finalisation, gating |
+| [`IntentSettler.invariant.t.sol`](test/IntentSettler.invariant.t.sol) | 9 | 3 property-fuzz × 256 runs + 6 stateful invariants × 256 runs × ~500 calls ≈ **768k random call sequences** (includes new `totalEthEscrowFloor` invariant — balance never dips below escrow ledger) |
+| [`IntentHash.t.sol`](test/IntentHash.t.sol) | 5 | EIP-712 parity (on-chain ↔ off-chain), `hashIntent` view matches `submitIntent` storage key |
+| [`SolverAuction.t.sol`](test/SolverAuction.t.sol) | 21 | window setup, signed proposals, ranking, finalisation, gating, `getProposals` aggregate view |
 | [`ChainPeerRegistry.t.sol`](test/ChainPeerRegistry.t.sol) | 6 | owner / EID / route configuration |
 | [`Integration.t.sol`](test/Integration.t.sol) | 3 | stack-deploys, submit-then-cancel, submit-match-auction lifecycle |
 | [`mocks/`](test/mocks/) | — | `MockERC20`, `MockUSDT` (non-bool returns), `MockLzEndpoint` |
 
-**Total: 87 unit/fuzz/integration tests + 5 invariants × 256 runs × ~500 calls. All passing.**
+**Total: 100 unit/fuzz/integration tests + 6 stateful invariants × 256 runs × ~500 calls. All passing.**
 
 ## Tooling status
 
 - **`forge build`** — clean (45 contracts, no errors)
-- **`forge test`** — 88/88 passing (one test count differs from the 87 list above due to suite-level rounding)
+- **`forge test`** — 100/100 passing
 - **`forge fmt --check`** — clean
-- **Slither** (`--filter-paths "lib/|test/" --exclude-low --exclude-informational`) — **0 medium+ findings across 41 contracts** (after R-03 false-positive suppression and R-01/R-02 fixes from the Stage 3 final review)
+- **Slither** (`--filter-paths "lib/|test/" --exclude-low --exclude-informational`) — **0 medium+ findings across 41 contracts** (after R-03 false-positive suppression and R-01/R-02/R-16/R-17/R-18 fixes from the Stage 3 final review + Opus security pass)
 
 ## Configuration
 
