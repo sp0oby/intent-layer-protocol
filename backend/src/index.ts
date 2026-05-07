@@ -1,12 +1,16 @@
 import 'dotenv/config';
+import {createServer} from 'node:http';
 import {createApp} from './server.js';
 import {getPool} from './db/pool.js';
 import {pgRepository} from './db/repository.js';
+import {publishingRepository} from './db/publishing-repository.js';
+import {createEventBus} from './services/event-bus.js';
+import {attachWsServer} from './services/ws-server.js';
 
 /** Build the runtime API config from process.env. The ETH/Base auction
- *  addresses default to the dev/Anvil zero-address when unset so the
- *  process boots without env vars (for type-only smoke tests); a real
- *  deploy must populate them via .env (see .env.example). */
+ *  addresses default to empty when unset so the process boots without
+ *  env vars (for type-only smoke tests); a real deploy must populate
+ *  them via .env (see .env.example). */
 function loadApiConfig() {
   const ethChainId = Number(process.env.ETH_CHAIN_ID ?? 1);
   const baseChainId = Number(process.env.BASE_CHAIN_ID ?? 8453);
@@ -19,8 +23,16 @@ function loadApiConfig() {
 }
 
 const port = Number(process.env.API_PORT ?? 4000);
-const repo = pgRepository(getPool());
+const bus = createEventBus();
+// publishingRepository wraps pgRepository so DB writes also fan out to
+// the WebSocket subscribers via the bus. Both the API (synchronous reads
+// + proposal ingest) and the indexer (event-driven writes) share this
+// repo; events flow only on the write side.
+const repo = publishingRepository(pgRepository(getPool()), bus);
 const app = createApp({repo, config: loadApiConfig()});
-app.listen(port, () => {
-  console.log(`API listening on ${port}`);
+
+const httpServer = createServer(app);
+attachWsServer(httpServer, bus);
+httpServer.listen(port, () => {
+  console.log(`API + WS listening on ${port}`);
 });

@@ -1,4 +1,4 @@
-import {describe, expect, it, vi, beforeEach} from 'vitest';
+import {describe, expect, it, vi, beforeEach, afterEach} from 'vitest';
 import request from 'supertest';
 import {SigningKey, Wallet, getBytes} from 'ethers';
 import {createApp, type ApiConfig} from '../src/server';
@@ -66,6 +66,10 @@ function makeRepo(rows: IntentRecord[]): OrderBookRepository {
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date(NOW * 1000));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('GET /health', () => {
