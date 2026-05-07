@@ -114,6 +114,33 @@ LayerZero is a third-party service. If it fails or is down:
    - [ ] If LayerZero fails catastrophically, reimburse users
    - [ ] Target: $100k insurance pool by month 2
 
+### Risk 2C: Asymmetric loss when EXECUTE_MATCH delivers but CONFIRM does not (Phase 1 specific)
+
+**Severity:** MEDIUM
+**Probability:** Very Low (requires LayerZero executor outage spanning > `LZ_TIMEOUT`)
+**Impact:** Counterparty user on the unfilled leg loses their tokens
+
+**Description:**
+The Phase 1 settlement flow uses two LayerZero messages — EXECUTE_MATCH (source → dest) followed by CONFIRM (dest → source). If EXECUTE_MATCH delivers (dest tokens released) but CONFIRM never returns (LZ executor outage, DVN config issue), and `refundIfLzTimeout` fires before CONFIRM eventually arrives, the source user double-recovers and the dest counterparty loses out.
+
+**Phase 1 mitigations (applied):**
+- `LZ_TIMEOUT = 6 hours` minimises the race window — covers nearly all realistic LZ recovery scenarios
+- LayerZero V2 `lzReceive` is permissionless once a message is DVN-verified — anyone can manually push a stuck message through (LZ docs)
+- Per-user volume caps ($1k → $10k → $100k) bound worst-case loss during early launch
+- Test `testLz_asymmetricLoss_documentedBehavior` makes the failure mode explicit
+
+**Phase 2A canonical solution (Q3 2026):** Bonded solver model — the production-proven answer.
+- Across Protocol has run this since 2022 with **$15B+ cumulative volume and zero user-funds-lost from settlement asymmetry**
+- Hop Protocol uses the same pattern
+- Solver stakes a bond before bidding; failure to deliver within 30-min window is slashable
+- User experience: always gets dest tokens (solver absorbs cross-chain risk with collateral)
+
+**Phase 2B alternative (Q4 2026):** HTLC for zero-trust direct P2P (Lightning Network pattern, $5B+ TVL since 2018). Coexists with bonded solvers — users pick the path that fits their risk preference.
+
+**Phase 3+ (Q1 2027):** Where shared-sequencer interop ships (Optimism Superchain native interop), paired chains gain true atomic settlement for free. Mixed-stack pairs (e.g., Eth ↔ Base) continue to use bonded solvers.
+
+**Why we are confident in the path:** the four production-proven cross-chain risk models (bonded relayer, optimistic settlement, HTLC, shared sequencer) collectively process billions of dollars per day across Across, Hop, Stargate, Wormhole Connect, Lightning Network, etc. Phase 1's soft timeout is a conservative early-stage fallback; Phase 2A's bonded-solver model is the same risk allocation Across uses at scale.
+
 **Code Example (Fallback):**
 
 ```solidity

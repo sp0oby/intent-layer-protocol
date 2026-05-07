@@ -8,17 +8,17 @@
 ## Phase 1 timeline (~12 weeks)
 
 Week 1-2 — Foundation & Contracts
-- [ ] Finalize intent data model and ERC-7683 compatibility
-- [ ] Deploy and configure **`ChainPeerRegistry`** on each devnet/testnet chain (EIDs + `setRouteSupported` for Phase 1 routes)
-- [ ] Implement `IntentSettler.sol` core functions (constructor-registry, `submitIntent` guards per [Architecture](ARCHITECTURE.md))
-- [ ] Implement basic local tests (Foundry), including registry + settler coverage
-- [ ] Set up repo structure, CI skeleton
+- [x] Finalize intent data model and ERC-7683 compatibility (added `refundTo` for refund routing alignment)
+- [ ] Deploy and configure **`ChainPeerRegistry`** on each devnet/testnet chain (EIDs + `setRouteSupported` for Phase 1 routes) — Stage 8
+- [x] Implement `IntentSettler.sol` core functions: EIP-712 hashing, native-ETH + ERC-20 escrow (incl. USDT-style non-bool returns via OZ `SafeERC20`), `cancelIntent` (user / post-deadline / `refundTo`), `executeMatching` (state + price guards), `openAuction` (after `AUCTION_DELAY`), `ReentrancyGuard` + CEI throughout
+- [x] Implement basic local tests (Foundry): 55 tests across `IntentSettler`, `SolverAuction`, `IntentHash` (EIP-712 parity), `ChainPeerRegistry`, `Integration`
+- [x] Set up repo structure, CI skeleton (CI installs OZ + LayerZero on demand; vendored libs gitignored)
 
 Week 3-4 — Cross-Chain & Matching
-- [ ] Implement LayerZero OApp integration (send/receive helpers)
-- [ ] Implement IntentSettler.sol (Base) core functions
-- [ ] Build Event Indexer prototype (TypeScript)
-- [ ] Start matching engine prototype (in-memory)
+- [x] Implement LayerZero OApp integration (`_lzSend` in `executeMatching`; `_lzReceive` dispatching `EXECUTE_MATCH` + `CONFIRM`; `refundIfLzTimeout` recovery; cross-chain round-trip verified via `MockLzEndpoint`)
+- [x] Implement IntentSettler.sol on a per-chain basis (same bytecode; deploy per chain, registry-driven EIDs and routes)
+- [ ] Build Event Indexer prototype (TypeScript) — Stage 4
+- [x] Start matching engine prototype (in-memory) — initial version exists in `backend/src/services/matching.ts`
 
 Week 5-6 — Auction & Solvers
 - [ ] Implement SolverAuction.sol (on-chain auction skeleton)

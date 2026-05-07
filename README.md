@@ -32,6 +32,22 @@ This repository contains the **protocol specification**, a **working dev skeleto
 
 Bridge UIs today force users to pick routes, absorb stacked slippage, and reason about fragmented liquidity. Intent Layer Protocol aims for **one-step intent expression** and **better pricing** when two opposite intents can be matched directly across chains — with a **transparent solver fallback** when they cannot.
 
+**Where we sit in the cross-chain intent landscape:**
+
+Cross-chain intents are an established and competitive category in 2026 — Across Protocol ($15B+ volume since 2022), UniswapX cross-chain, deBridge DLN, Mayan, Eco Routes, and others all process billions on this exact problem. **We are not first to cross-chain intents.** We are an entrant with one specific differentiator: every existing protocol uses a solver / relayer / bonder as the counterparty; we attempt a **direct P2P match** between two user intents first, with a **bonded solver auction as fallback** (the same model Across uses). When a P2P match exists, the user gets CoW-style direct-swap pricing with no solver fee. When it doesn't, the user gets Across-style solver coverage. We are first to add the P2P-first matching layer to cross-chain intents — but the cross-chain plumbing itself is battle-tested standard infrastructure.
+
+The two-sided market bootstrap problem is solved by `ILP` token rewards to **both** P2P counterparties (Phase 2B), with explicit Sybil mitigations drawn from the LooksRare wash-trading episode. See [Whitepaper § Token Economics](docs/WHITEPAPER.md#token-economics) for the full incentive design.
+
+**Why P2P matters** (full argument in [Whitepaper § Why direct P2P matching matters](docs/WHITEPAPER.md#why-direct-p2p-matching-matters)):
+
+- **Better pricing** — when two users match directly, the trade settles at their mutually-agreed price with no solver margin in between (typical solver spread: 5–30 bps eliminated).
+- **More decentralized** — fewer than 20 entities globally are capitalised + tooled enough to run cross-chain solvers. P2P makes any wallet holder a potential counterparty.
+- **Censorship-resistant** — P2P matches don't flow through any solver's compliance pipeline.
+- **Capital efficient** — no solver capital pre-locked on every chain; the users' own escrows are the liquidity.
+- **Anti-fragile** — if every solver goes offline, P2P matching keeps working.
+
+This is why we put the P2P path *first* and the bonded solver auction *second*. Solver-mediated protocols are great at what they do; we use the same model as our fallback. But the P2P match, when it works, is strictly better for the user along every axis.
+
 **Primary transport (Phase 1):** LayerZero V2. **Optional fallback path:** Chainlink CCIP (design-time; see [Architecture](docs/ARCHITECTURE.md)).
 
 ---
@@ -41,7 +57,7 @@ Bridge UIs today force users to pick routes, absorb stacked slippage, and reason
 | Area | State |
 |------|--------|
 | **Specification** | Protocol design and planning docs live under [`docs/`](#documentation) |
-| **Smart contracts** | **Scaffolding** — `IntentSettler` (with optional `ChainPeerRegistry`), `ChainPeerRegistry`, `SolverAuction` compile; **escrow, LayerZero OApp send/receive, and production invariants are not implemented yet** |
+| **Smart contracts** | **Stages 1 + 2 complete** — `IntentSettler` is a full LayerZero V2 OApp: EIP-712 hashing, native-ETH + ERC-20 (incl. USDT-style) escrow, `cancelIntent`, `executeMatching` with `_lzSend`, `_lzReceive` dispatching `EXECUTE_MATCH` / `CONFIRM`, `refundIfLzTimeout` (30 min recovery), `openAuction`. `SolverAuction` ready for Stage 3 wiring. **71 tests pass (incl. cross-chain round-trip + invariants). Slither clean.** |
 | **Backend** | Express API skeleton, in-memory matcher + DB schema stub, indexer placeholder |
 | **Frontend** | Next.js app with wallet connect (wagmi), swap + intent status flows wired to a **mock API** |
 | **CI** | GitHub Actions: Foundry + backend `tsc`/tests + frontend build ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) |

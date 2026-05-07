@@ -17,6 +17,8 @@ Layer 2: Intent Matching & Auction Layer (Off-Chain)
 Layer 3: Settlement & Execution Layer (On-Chain)
 ```
 
+**Why this architecture is P2P-first.** Layer 2 attempts a direct P2P match between two real-user intents BEFORE opening the solver auction. When a P2P match exists, the trade settles user-to-user at mutually-agreed pricing — no solver margin, no capital pre-locked on every chain by intermediaries, no compliance pipeline gating who can be a counterparty. This is the original peer-to-peer ethos of decentralized finance applied to cross-chain settlement, and it's strictly better for the user along every axis when a counterparty exists. The bonded-solver auction (Phase 2A) handles the cases where no counterparty is available. See [Whitepaper § Why direct P2P matching matters](WHITEPAPER.md#why-direct-p2p-matching-matters) for the full economic and decentralization argument.
+
 ---
 
 ## Layer 1: User Expression Layer
@@ -207,44 +209,60 @@ Winner: Solver A (best price for user)
 - **Pairs with:** `IntentSettler` constructor address; LayerZero **OApp `setPeer`** for remote contract addresses. Registry does **not** replace `setPeer`; it replaces **hardcoded EIDs** and gives a **single place** to widen or narrow routes.
 - **Source:** [`contracts/src/ChainPeerRegistry.sol`](../contracts/src/ChainPeerRegistry.sol), [`IChainPeerRegistry.sol`](../contracts/src/interfaces/IChainPeerRegistry.sol).
 
-#### 1. IntentSettler.sol (Ethereum)
+#### 1. IntentSettler.sol (same on every chain)
 
 ```solidity
-contract IntentSettler {
-    // State
+contract IntentSettler is IIntentSettler, EIP712, ReentrancyGuard {
+    // Storage — full Intent kept for off-chain readability; metadata packed
+    // into one slot (state + settled + 3 timestamps) for ~21k gas savings
+    // per submit and ~44k per state transition.
     mapping(bytes32 => Intent) public intents;
-    mapping(bytes32 => bool) public settled;
-    mapping(address => uint256) public nonces;
-    
-    // Events
-    event IntentSubmitted(
-        bytes32 indexed intentHash,
-        address indexed user,
-        uint256 amount,
-        address token
-    );
-    
-    event IntentMatched(bytes32 indexed intentHash);
-    
-    event IntentSettled(
-        bytes32 indexed intentHash,
-        address indexed recipient,
-        uint256 amount
-    );
-    
-    // Core functions
-    function submitIntent(Intent calldata intent) external;
-    function settleIntent(
-        bytes32 intentHash,
-        bytes calldata solverSignature
-    ) external;
-    function executeMatching(
-        bytes32 intentHashA,
-        bytes32 intentHashB
-    ) external;
+    mapping(bytes32 => IntentMeta) internal _meta;
+    mapping(address => mapping(uint256 => bool)) public usedNonces; // set, not counter
+    mapping(bytes32 => address) public matchedRecipient;            // set in Stage 2
+
+    // Events — `IntentSubmitted` carries the full Intent so indexers can
+    // reconstruct order-book rows from a single log. `IntentMatched` carries
+    // both hashes so the indexer knows the cross-chain pair.
+    event IntentSubmitted(bytes32 indexed intentHash, address indexed user, Intent intent);
+    event IntentCancelled(bytes32 indexed intentHash);
+    event IntentMatched(bytes32 indexed localHash, bytes32 indexed remoteHash);
+    event AuctionOpened(bytes32 indexed intentHash, uint256 auctionDeadline);
+    event IntentLocked(bytes32 indexed intentHash);
+    event IntentSettled(bytes32 indexed intentHash, address indexed recipient, uint256 amount);
+    event IntentRefunded(bytes32 indexed intentHash, address indexed recipient, uint256 amount);
+
+    // Core functions — `executeMatching` accepts price constraints from the
+    // matcher backend so the contract can validate symmetry on-chain even
+    // though the remote intent lives on the other chain.
+    function submitIntent(Intent calldata intent) external payable returns (bytes32);
     function cancelIntent(bytes32 intentHash) external;
+    function executeMatching(
+        bytes32 localHash,
+        bytes32 remoteHash,
+        uint256 remoteSourceAmount,
+        uint256 remoteMinDestAmount
+    ) external payable;
+    function openAuction(bytes32 intentHash) external;
+    function refundIfLzTimeout(bytes32 intentHash) external; // Stage 2
 }
 ```
+
+**State machine** (canonical names match the Solidity enum):
+
+```
+None → Pending → Matched   →  Locked  →  Settled
+           ↓
+       Auctioning → … (Stage 3) → Settled
+
+Cancelled and Refunded are terminal off-path states.
+```
+
+`Pending` corresponds to legacy "SUBMITTED"; `Auctioning` to "AUCTIONED";
+`Settled` to "CONFIRMED"; `Refunded` is reached via `refundIfLzTimeout` after
+a LayerZero delivery failure (Stage 2). `submitIntent` always lands in
+`Pending`; `executeMatching` transitions Pending → Matched (Stage 1) and
+will trigger the LayerZero send (Stage 2).
 
 **Responsibilities:**
 - Receive intents from users
@@ -382,53 +400,81 @@ Phase 1 ships **Ethereum + Base**, but settlement should be **chain-agnostic** s
 
 **Problem:** What if Ethereum confirms but Base fails?
 
-**Solution:** Two-Phase Commit
+**Solution:** Two-Phase Commit with timeout-based recovery.
 
 ```
-Phase 1: Lock (both chains lock tokens)
-├─ Ethereum: Lock ETH in escrow
-└─ Base: Lock USDC in escrow
+Phase 1: Match + send (executeMatching on source chain)
+├─ Validates state + price + deadline locally
+├─ Transitions local intent: Pending → Matched
+└─ Sends LayerZero message to destination chain (Stage 2)
 
-Phase 2: Commit (release tokens)
-├─ If both chains agree: Release tokens
-└─ If one chain fails: Both refund after timeout
+Phase 2: Lock + release (destination _lzReceive, Stage 2)
+├─ Validates message version + trusted peer
+├─ Transitions remote intent: Pending → Locked
+├─ Releases destination token to source-chain user
+└─ Sends confirmation back
 
-Timeout: 10 blocks (~2 minutes)
+Phase 3: Settle (source _lzReceive on confirmation, Stage 2)
+├─ Transitions local intent: Matched → Settled
+└─ Releases source token to destination-chain user
+
+Recovery: If the destination LayerZero message never delivers, the source
+user can call `refundIfLzTimeout(intentHash)` after `LZ_TIMEOUT = 30 minutes`
+to recover funds. The 30-minute window is intentionally longer than the
+expected 3–5 minute settlement so users do not get spurious refunds during
+normal LayerZero confirmation latency.
 ```
 
 **Code:**
 
 ```solidity
-enum IntentState { PENDING, LOCKED, SETTLED, CANCELLED }
+enum IntentState { None, Pending, Matched, Auctioning, Locked, Settled, Cancelled, Refunded }
 
-mapping(bytes32 => IntentState) public intentState;
-mapping(bytes32 => uint256) public intentLockTime;
+struct IntentMeta {
+    IntentState state;
+    bool settled;
+    uint64 submittedAt;
+    uint64 matchTimestamp;
+    uint64 auctionDeadline;
+}
+mapping(bytes32 => IntentMeta) internal _meta;
 
-function cancelIfTimeout(bytes32 intentHash) external {
-    if (block.timestamp > intentLockTime[intentHash] + 600) {
-        // Refund to user
-        refund(intentHash);
-    }
+uint256 public constant LZ_TIMEOUT = 30 minutes;
+
+function refundIfLzTimeout(bytes32 intentHash) external {
+    IntentMeta memory meta = _meta[intentHash];
+    require(meta.state == IntentState.Matched, "not matched");
+    require(block.timestamp >= meta.matchTimestamp + LZ_TIMEOUT, "too early");
+    // Effects: state → Refunded; Interactions: refund escrow.
 }
 ```
 
 ### Data Models
 
-**Intent State Machine:**
+**Intent State Machine** (canonical names match the on-chain enum):
 
 ```
-SUBMITTED
-    ↓
-MATCHED (if P2P match found) OR AUCTIONED (if no match)
-    ↓
-LOCKED (on both chains)
-    ↓
-SETTLED (tokens released)
-    
-OR
-    
-CANCELLED (timeout or user cancel)
+None → Pending ──[executeMatching]──→ Matched ──[LZ confirm]──→ Settled
+            │
+            ├─[openAuction after 30s]─→ Auctioning ──[counterpart match]──→ Matched
+            │
+            └─[cancelIntent / expired]─→ Cancelled (terminal, refunded)
+                                                        ↑
+                                                Refunded ←─[refundIfLzTimeout]
 ```
+
+`Pending` is the post-submission state (legacy "SUBMITTED"). `Auctioning`
+is the solver-auction lane (legacy "AUCTIONED"). `Refunded` is reached
+only via the LayerZero timeout recovery path.
+
+**Phase 1 settlement is atomic.** On the destination chain, `_handleExecuteMatch`
+validates the local intent, marks it `Settled`, releases tokens, and sends
+the `CONFIRM` reply — all in one transaction. There is no observable window
+between "committed" and "released." The `Locked` enum value exists for
+**reservation** only: Phase 2B may introduce an async-settlement design
+(HTLC / optimistic settlement / escrow review windows) that uses it. Keeping
+the index stable means a future `IntentSettler` revision can adopt `Locked`
+without re-shuffling the enum and breaking off-chain readers.
 
 **Order Book Schema:**
 
@@ -455,28 +501,48 @@ CREATE INDEX idx_intent_deadline ON intents(deadline);
 
 ### Gas Optimization
 
-**Phase 1 Costs (Ethereum):**
+**Stage 1 measured costs** (from `.gas-snapshot`, per-test totals include
+the `setUp` deploy of `IntentSettler` + `ChainPeerRegistry`; the *incremental*
+cost of each operation is roughly half the test number):
 
-Per-intent operations:
-- `submitIntent`: ~100k gas (approval + submission)
-- `executeMatching`: ~150k gas (2 intents)
-- LayerZero message: ~200k gas on dest chain
+| Operation | Test gas | Incremental est. |
+|-----------|---------:|-----------------:|
+| `submitIntent` (native ETH) | 246,728 | ~140k |
+| `submitIntent` (ERC-20) | 343,119 | ~180k |
+| `cancelIntent` (ETH refund) | 279,061 | ~50k |
+| `cancelIntent` (ERC-20 refund) | 352,007 | ~85k |
+| `executeMatching` (Stage 1, no LZ yet) | 269,686 | ~45k |
+| `openAuction` | 269,787 | ~45k |
 
-**Cost breakdown (at 30 gwei):**
-- User cost: ~3-5 USDC
-- Protocol cost: ~6-10 USDC
-- Total: ~$0.10-0.15 per transaction
+Stage 2 adds ~30–50k for `_lzSend` + `_lzReceive` gas accounting.
+
+**Optimizations applied in Stage 1:**
+
+- **Packed `IntentMeta` struct** — state, settled flag, and three `uint64`
+  timestamps in a single 32-byte slot. Saves ~21k gas per `submitIntent`
+  and ~44k per state transition vs. five separate mappings.
+- **Field-level reads in hot paths** — `cancelIntent` and `executeMatching`
+  read only the four to five Intent fields they need rather than copying
+  the full 10-field struct from storage to memory.
+- **Custom errors** instead of `require` strings — saves ~20–50 gas per
+  revert path.
+- **`uint64` timestamps** — fits in the packed slot, safe until year 2554.
+
+**Future optimization candidates** (not applied — measured trade-off):
+
+- **Trim Intent storage** — only persist `user`, `refundTo`, `sourceToken`,
+  `sourceAmount`, `minDestAmount`, `deadline`, `destChainId`. Saves ~3 SSTOREs
+  per submit (60k gas) at the cost of indexer-only reads for the dropped
+  fields. Defer until Phase 2 when deploy-cost amortization is clearer.
+- **Batch settlements** — process 10+ matched pairs in one transaction.
+  Phase 2 design.
+- **`viaIR` optimizer** — typical 5–15% gas saving on complex contracts.
+  Enable for production deploy after compatibility check with Slither.
 
 **Competitive vs. current bridges:**
 - Stargate: ~0.25%
 - Across: ~0.15%
-- Intent Layer Protocol: 0.10% + gas
-
-**Optimization Strategies:**
-- Batch settlements - Process 10+ intents in one transaction
-- Off-chain order book - Reduce on-chain storage
-- Calldata compression - Pack intent data efficiently
-- LayerZero optimization - Use cheaper message types
+- Intent Layer Protocol target: 0.10% + gas
 
 ---
 

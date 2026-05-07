@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {IChainPeerRegistry} from "./interfaces/IChainPeerRegistry.sol";
+import { IChainPeerRegistry } from "./interfaces/IChainPeerRegistry.sol";
 
 /// @title ChainPeerRegistry
 /// @notice Owner-configured `chainId` → LayerZero V2 endpoint id + intent route allowlist for a **single chain deployment**.

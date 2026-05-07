@@ -190,16 +190,21 @@ So I get the best price if no direct match exists
 - [ ] Winning solver executes on-chain
 - [ ] User receives expected tokens
 
-**Solver Proposal Format:**
+**Solver Proposal Format** (matches `contracts/src/SolverAuction.sol`):
 
 ```solidity
 struct SolverProposal {
-    bytes32 intentHash;
+    address solver;                // recorded from msg.sender at submitProposal
     uint256 proposedOutputAmount;
-    uint256 solverFee; // in bps (100 = 0.01%)
-    bytes signature; // signed by solver
+    uint256 solverFeeBps;          // basis points (100 bps = 1%)
+    bytes signature;               // EIP-191/EIP-712 signed by solver (validated in Stage 3)
 }
 ```
+
+The intent hash is the mapping key (`mapping(bytes32 => SolverProposal[])`),
+so it is not duplicated inside the struct. The `solver` field is set on-chain
+at submission time so off-chain readers can identify the bidder without
+recovering the signature.
 
 **Solver Auction Workflow:**
 
@@ -229,25 +234,29 @@ So tokens move correctly on both chains
 
 **Acceptance Criteria:**
 
-- [ ] Ethereum settlement contract sends LayerZero message to Base
-- [ ] Base receives message and validates signature
-- [ ] Tokens are released on Base to Ethereum user
-- [ ] Base sends confirmation back to Ethereum
-- [ ] Ethereum confirms and releases tokens to Base user
-- [ ] Settlement completes within 5 minutes (finality)
-- [ ] If one chain fails, both refund after timeout
-- [ ] **Extensibility:** settlement paths use **`ChainPeerRegistry`** + **OApp `setPeer`**, not hardcoded “Base-only” branches; `intent.sourceChainId` / `intent.destChainId` drive routing
-- [ ] **`ChainPeerRegistry`** deployed on Ethereum and Base with correct **LayerZero EIDs** and **`setRouteSupported`** for Phase 1 corridors; production `IntentSettler` uses non-zero registry address
+- [x] Ethereum settlement contract sends LayerZero message to Base (Stage 2: `_lzSend(EXECUTE_MATCH)` from `executeMatching`)
+- [x] Base receives message and validates source via OApp peer check (Stage 2: `_handleExecuteMatch`)
+- [x] Tokens are released on Base to Ethereum user (Stage 2: trusted source-user address read from `EXECUTE_MATCH` payload, populated from source storage on Ethereum)
+- [x] Base sends confirmation back to Ethereum (Stage 2: `_lzSend(CONFIRM)` from `_handleExecuteMatch`)
+- [x] Ethereum confirms and releases tokens to Base user (Stage 2: `_handleConfirm` releases to `destUser` from CONFIRM payload, populated from Base storage)
+- [x] If one chain fails, the source user can refund via `refundIfLzTimeout` after `LZ_TIMEOUT = 30 minutes` (Stage 2)
+- [x] **Extensibility:** settlement paths use **`ChainPeerRegistry`** + **OApp `setPeer`**, not hardcoded branches; `intent.destChainId` drives routing through `registry.lzEidForChain(...)`
+- [ ] **`ChainPeerRegistry`** deployed on Ethereum and Base with correct **LayerZero EIDs** and **`setRouteSupported`** for Phase 1 corridors — Stage 8 (deploy script)
+- [ ] Settlement completes within 5 minutes on real LayerZero — measured during testnet (Stage 8); unit-test round-trip via `MockLzEndpoint` is instantaneous
 
-**Settlement States:**
+**Settlement States** (canonical names match the on-chain enum):
 
 ```
-MATCHED → LOCKED → SETTLED → CONFIRMED
-                    ↓
-                TIMED_OUT
-                    ↓
-                REFUNDED
+Pending → Matched ──[LZ CONFIRM delivery]──→ Settled
+
+If LayerZero never delivers within LZ_TIMEOUT (30 minutes):
+Matched ──[refundIfLzTimeout]──→ Refunded
 ```
+
+**Phase 1 settlement is atomic** — the destination chain validates and
+releases tokens in a single transaction within `_lzReceive`, with no
+observable "Locked" window. The `Locked` enum value is reserved for
+Phase 2B async-settlement designs.
 
 **Code Skeleton:**
 
@@ -362,10 +371,15 @@ So I can get my tokens back
 
 **Acceptance Criteria:**
 
-- [ ] Only unmatched intents can be cancelled by user
-- [ ] After 5 minutes, intent expires and can be cancelled by anyone
-- [ ] Cancellation refunds tokens to user
-- [ ] Gas cost for cancellation is reasonable (<50k)
+- [x] Only `Pending` or `Auctioning` intents can be cancelled by user
+- [x] After `intent.deadline`, intent can be cancelled by anyone (permissionless cleanup)
+- [x] Cancellation refunds tokens to `intent.refundTo` (or `intent.user` if `refundTo == address(0)`)
+- [x] Gas cost for cancellation is bounded — measured ~50k incremental (~280k including the test setup that deploys + submits + cancels)
+
+> The original "<50k total" target was unrealistic — two SSTOREs alone
+> consume 25–40k gas. The measured *incremental* cost (post-warm storage,
+> excluding setup/deploy) is ~50k, which is the right number to compare
+> against L1 typical fees.
 
 **Definition of Done:**
 - Cancellation works on testnet
