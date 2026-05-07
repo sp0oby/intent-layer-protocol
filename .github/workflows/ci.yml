@@ -15,6 +15,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
+        with:
+          # Authenticate the foundryup release-tag lookup against the GitHub
+          # API. Without this, runners can hit the 60 req/hr unauthenticated
+          # rate limit (HTTP 403) when "stable" is resolved to a release tag.
+          token: ${{ secrets.GITHUB_TOKEN }}
+          version: stable
       - name: Install Solidity dependencies
         run: |
           forge install OpenZeppelin/openzeppelin-contracts@v5.1.0 --no-git --shallow
