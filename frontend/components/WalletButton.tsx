@@ -2,36 +2,33 @@
 
 import {Check, Copy, LogOut} from 'lucide-react';
 import {useState} from 'react';
-import {useChainId, useConnect, useConnection, useDisconnect} from 'wagmi';
+import {useChainId, useConnection, useDisconnect} from 'wagmi';
 import {toast} from 'sonner';
 import {Button} from '@/components/ui/button';
+import {WalletPickerDialog} from '@/components/WalletPickerDialog';
 import {chainShortName, isSupportedChain} from '@/lib/chains';
 
 /**
  * Single-button wallet control. Two states:
- *   disconnected → "Connect wallet" (primary action)
+ *   disconnected → "Connect wallet" — opens the multi-wallet picker
  *   connected    → "[chain] · 0x1234…cdef" with a popover for copy + disconnect
  *
- * useConnection replaces wagmi v3's deprecated useAccount alias. We call
- * the first available connector (typically Injected / browser wallet); a
- * proper picker can come later when WalletConnect / Coinbase Wallet land.
+ * useConnection replaces wagmi v3's deprecated useAccount alias.
  */
 export function WalletButton() {
   const {address, isConnected} = useConnection();
-  const {connect, connectors, isPending: connectPending} = useConnect();
   const {disconnect} = useDisconnect();
   const chainId = useChainId();
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   if (!isConnected || !address) {
-    const connector = connectors[0];
     return (
-      <Button
-        size="sm"
-        disabled={!connector || connectPending}
-        onClick={() => connector && connect({connector})}
-      >
-        {connectPending ? 'Connecting…' : 'Connect wallet'}
-      </Button>
+      <>
+        <Button size="sm" onClick={() => setPickerOpen(true)}>
+          Connect wallet
+        </Button>
+        <WalletPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} />
+      </>
     );
   }
 
