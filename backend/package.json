@@ -9,7 +9,8 @@
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "tsc -p tsconfig.json --noEmit"
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "extract-abis": "node scripts/extract-abis.mjs"
   },
   "dependencies": {
     "dotenv": "^16.4.5",

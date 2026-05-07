@@ -29,6 +29,7 @@ The matcher's filter is an **efficiency optimisation, not a security boundary** 
 | `npm start` | Run compiled `dist/index.js` |
 | `npm run lint` | `tsc --noEmit` (typecheck) |
 | `npm test` | Vitest |
+| `npm run extract-abis` | Re-extract `src/abis/*.json` from `contracts/out/` (run after `forge build`) |
 
 ---
 
@@ -44,10 +45,13 @@ Copy [`.env.example`](../.env.example) to `.env` at repo root or set variables i
 |------|------|
 | [`src/server.ts`](src/server.ts) | Express app factory (`createApp`); `/health`, `/api/intents/unmatched`, `/api/solver/proposals` (501 until W4-04) |
 | [`src/index.ts`](src/index.ts) | HTTP listen entry |
+| [`src/abis/`](src/abis/) | ABI-only JSON extracted from Foundry artifacts (regenerate via `npm run extract-abis`) |
+| [`src/types/intent.ts`](src/types/intent.ts) | Canonical TypeScript shapes mirroring `IIntentSettler.Intent` / `IntentMeta` / `IntentState` |
 | [`src/services/matching.ts`](src/services/matching.ts) | `IntentRecord` type (mirrors on-chain `Intent` struct) + `findOppositeIntent` + `InMemoryOrderBook` |
 | [`src/services/indexer.ts`](src/services/indexer.ts) | Blockchain listener placeholder (W4-01) |
 | [`src/db/pool.ts`](src/db/pool.ts) | `pg.Pool` factory + healthcheck |
 | [`database/migrations/`](database/migrations/) | Postgres DDL — `001_init.sql`, `002_align_with_contract.sql` |
+| [`scripts/extract-abis.mjs`](scripts/extract-abis.mjs) | Foundry artifact → ABI-only JSON extractor (95%+ size reduction) |
 | [`tests/`](tests/) | Vitest specs |
 
 ---
