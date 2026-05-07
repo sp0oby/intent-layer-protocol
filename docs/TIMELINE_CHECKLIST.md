@@ -17,17 +17,19 @@ Week 1-2 — Foundation & Contracts
 Week 3-4 — Cross-Chain & Matching
 - [x] Implement LayerZero OApp integration (`_lzSend` in `executeMatching`; `_lzReceive` dispatching `EXECUTE_MATCH` + `CONFIRM`; `refundIfLzTimeout` recovery; cross-chain round-trip verified via `MockLzEndpoint`)
 - [x] Implement IntentSettler.sol on a per-chain basis (same bytecode; deploy per chain, registry-driven EIDs and routes)
+- [x] **Follow-up security pass** — closed R-16 (price/token validation now enforced on destination using trusted data; matcher cannot bypass `minDestAmount` / `destToken`), R-17 (CONFIRM-leg source-EID guard), R-18 (operator pre-fund segregated from user ETH escrow via `totalEthEscrow` ledger + `withdrawOperatorFunds`). 100/100 tests, Slither clean.
 - [ ] Build Event Indexer prototype (TypeScript) — Stage 4
 - [x] Start matching engine prototype (in-memory) — initial version exists in `backend/src/services/matching.ts`
 
 Week 5-6 — Auction & Solvers
-- [ ] Implement SolverAuction.sol (on-chain auction skeleton)
-- [ ] Expose solver API (REST) for proposals
-- [ ] Implement basic solver reference implementation (bot)
-- [ ] Integrate solver auction flow into matching engine
+- [x] Implement SolverAuction.sol (on-chain auction with signed proposals, deterministic ranking, idempotent winner finalisation, settler-gated window)
+- [x] Wire `IntentSettler` ↔ `SolverAuction` (`openAuction` propagates window; `executeMatching` accepts Auctioning state)
+- [ ] Expose solver API (REST) for proposals — Stage 4
+- [ ] Implement basic solver reference implementation (bot) — Stage 4
+- [ ] Integrate solver auction flow into matching engine — Stage 4
 
 Week 7 — Frontend MVP
-- [ ] Implement React swap UI (Next.js) with MetaMask via wagmi
+- [ ] Implement React swap UI (Next.js) with MetaMask via wagmi — **Uniswap-style one-click minimal UX**
 - [ ] Show intent lifecycle and links to tx explorers
 - [ ] Connect frontend to backend API and test submission flow
 
@@ -62,11 +64,11 @@ Week 12 — Limited Mainnet Launch
 ## Minimal Acceptance Checklist (Phase 1)
 
 Smart Contracts
-- [ ] Intent submission works and escrows tokens
-- [ ] Intent events emitted and indexed
-- [ ] P2P matching results in atomic cross-chain settlement
-- [ ] Solver auction functions accept and select proposals
-- [ ] Timeouts/refunds work reliably
+- [x] Intent submission works and escrows tokens (native ETH + ERC-20 incl. USDT-style)
+- [x] Intent events emitted (indexer to consume — Stage 4)
+- [x] P2P matching results in atomic cross-chain settlement (token + chain + both-sides amount enforced on destination)
+- [x] Solver auction functions accept and select proposals (signed digest; deterministic ranking)
+- [x] Timeouts/refunds work reliably (6 hr LZ_TIMEOUT, self-serve refundIfLzTimeout, escrow-floor invariant)
 
 Backend
 - [ ] Indexer indexes events reliably (100% of events)
@@ -104,6 +106,6 @@ Operations
 
 | | |
 |:---|:---|
-| **Version** | 1.0 |
-| **Last updated** | 2026-05-06 |
-| **Status** | Checklist — tick items as completed; adjust scope with MVP spec |
+| **Version** | 1.1 |
+| **Last updated** | 2026-05-07 |
+| **Status** | Weeks 1-6 contract scope complete; Stage 4 (backend services) is the next milestone |
