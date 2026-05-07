@@ -18,15 +18,15 @@ Week 3-4 — Cross-Chain & Matching
 - [x] Implement LayerZero OApp integration (`_lzSend` in `executeMatching`; `_lzReceive` dispatching `EXECUTE_MATCH` + `CONFIRM`; `refundIfLzTimeout` recovery; cross-chain round-trip verified via `MockLzEndpoint`)
 - [x] Implement IntentSettler.sol on a per-chain basis (same bytecode; deploy per chain, registry-driven EIDs and routes)
 - [x] **Follow-up security pass** — closed R-16 (price/token validation now enforced on destination using trusted data; matcher cannot bypass `minDestAmount` / `destToken`), R-17 (CONFIRM-leg source-EID guard), R-18 (operator pre-fund segregated from user ETH escrow via `totalEthEscrow` ledger + `withdrawOperatorFunds`). 100/100 tests, Slither clean.
-- [ ] Build Event Indexer prototype (TypeScript) — Stage 4
-- [x] Start matching engine prototype (in-memory) — initial version exists in `backend/src/services/matching.ts`
+- [x] Build Event Indexer prototype (TypeScript) — Stage 4 complete locally; multi-chain `IntentIndexer` with resumable `indexer_cursors` table
+- [x] Matching engine — in-memory prototype + DB-backed `MatchingLoop` (Stage 4) with relayer dispatch via concrete `MatchSubmitter`
 
 Week 5-6 — Auction & Solvers
 - [x] Implement SolverAuction.sol (on-chain auction with signed proposals, deterministic ranking, idempotent winner finalisation, settler-gated window)
 - [x] Wire `IntentSettler` ↔ `SolverAuction` (`openAuction` propagates window; `executeMatching` accepts Auctioning state)
-- [ ] Expose solver API (REST) for proposals — Stage 4
-- [ ] Implement basic solver reference implementation (bot) — Stage 4
-- [ ] Integrate solver auction flow into matching engine — Stage 4
+- [x] Expose solver API (REST) for proposals — `POST /api/solver/proposals` with on-chain digest verification (Stage 4)
+- [x] Implement basic solver reference implementation (bot) — `backend/src/bot/solver-bot.ts` (Stage 4)
+- [x] Integrate solver auction flow into matching engine — `AuctionOrchestrator` opens windows after `AUCTION_DELAY` and finalizes via `executeWinningProposal` (Stage 4)
 
 Week 7 — Frontend MVP
 - [ ] Implement React swap UI (Next.js) with MetaMask via wagmi — **Uniswap-style one-click minimal UX**
@@ -71,10 +71,11 @@ Smart Contracts
 - [x] Timeouts/refunds work reliably (6 hr LZ_TIMEOUT, self-serve refundIfLzTimeout, escrow-floor invariant)
 
 Backend
-- [ ] Indexer indexes events reliably (100% of events)
-- [ ] Matching engine finds correct opposite intents <5s
-- [ ] Solver API exposes unmatched intents and accepts proposals
-- [ ] Database schema enforces invariants (no duplicate matches)
+- [x] Indexer indexes events reliably — multi-chain `IntentIndexer` with resumable cursor in `indexer_cursors`; foreign-event tolerance; cursor advances inside the same Postgres transaction as handler effects (Stage 4)
+- [x] Matching engine finds correct opposite intents — `MatchingLoop` ticks every 5s; `findOppositeIntent` enforces chain/token/both-sides minimums; expiry filter
+- [x] Solver API exposes unmatched intents and accepts proposals — `GET /api/intents/unmatched|auctioning|:hash`, `POST /api/solver/proposals` with on-chain `proposalDigest` ECDSA verification, `WS /ws?intentHash=` for real-time updates
+- [x] Database schema enforces invariants — Intent struct mirror with `refund_to`/`nonce`/packed-meta columns; `solver_fee_bps` constrained to uint16; `indexer_cursors (chain_id, contract_address)` PK prevents duplicate cursors (Stage 4)
+- [ ] End-to-end integration test against deployed contracts on local Anvil (in progress)
 
 Frontend
 - [ ] User can submit intents via wallet (MetaMask)

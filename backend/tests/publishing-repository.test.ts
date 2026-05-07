@@ -78,7 +78,6 @@ describe('publishingRepository', () => {
   it.each([
     ['markCancelled', 'CANCELLED'],
     ['markSettled', 'SETTLED'],
-    ['markRefunded', 'REFUNDED'],
     ['markAuctioning', 'AUCTIONING'],
   ] as const)('emits StateChange %s -> %s', async (method, state) => {
     const events: IntentEvent[] = [];
@@ -89,12 +88,38 @@ describe('publishingRepository', () => {
       await repo.markCancelled({intentHash: HASH_A, cancelTxHash: TX});
     } else if (method === 'markSettled') {
       await repo.markSettled({intentHash: HASH_A, settleTxHash: TX, blockTimestamp: 0});
-    } else if (method === 'markRefunded') {
-      await repo.markRefunded({intentHash: HASH_A, refundTxHash: TX, blockTimestamp: 0});
     } else {
       await repo.markAuctioning({intentHash: HASH_A, auctionDeadline: 100});
     }
     expect(events[0]).toMatchObject({type: 'StateChange', newState: state});
+  });
+
+  it('emits REFUNDED only when prior state was MATCHED (LZ-timeout path)', async () => {
+    const events: IntentEvent[] = [];
+    const bus = createEventBus();
+    bus.on(HASH_A, (e) => events.push(e));
+    const inner = makeInner();
+    (inner.getIntent as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      intentHash: HASH_A,
+      state: 'MATCHED',
+    });
+    const repo = publishingRepository(inner, bus);
+    await repo.markRefunded({intentHash: HASH_A, refundTxHash: TX, blockTimestamp: 0});
+    expect(events[0]).toMatchObject({type: 'StateChange', newState: 'REFUNDED'});
+  });
+
+  it('does NOT emit REFUNDED when prior state was CANCELLED (cancel-path refund)', async () => {
+    const events: IntentEvent[] = [];
+    const bus = createEventBus();
+    bus.on(HASH_A, (e) => events.push(e));
+    const inner = makeInner();
+    (inner.getIntent as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      intentHash: HASH_A,
+      state: 'CANCELLED',
+    });
+    const repo = publishingRepository(inner, bus);
+    await repo.markRefunded({intentHash: HASH_A, refundTxHash: TX, blockTimestamp: 0});
+    expect(events).toEqual([]);
   });
 
   it('does not emit if the underlying mutation throws', async () => {

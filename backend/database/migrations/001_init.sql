@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS intents (
     state VARCHAR(20) NOT NULL DEFAULT 'PENDING',
     created_at TIMESTAMP DEFAULT NOW(),
     settled_at TIMESTAMP,
-    CONSTRAINT idx_intents_state CHECK (state IN ('PENDING', 'MATCHED', 'LOCKED', 'SETTLED', 'CANCELLED', 'REFUNDED'))
+    CONSTRAINT chk_intents_state CHECK (state IN ('PENDING', 'MATCHED', 'LOCKED', 'SETTLED', 'CANCELLED', 'REFUNDED'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_intents_state ON intents (state);

@@ -56,13 +56,22 @@ export function publishingRepository(inner: OrderBookRepository, bus: IntentEven
     },
 
     async markRefunded(payload, client) {
+      // The contract emits IntentRefunded from BOTH the LZ-timeout path
+      // (state MATCHED -> REFUNDED) and the cancel path (state already
+      // moved to CANCELLED via IntentCancelled). Only emit a REFUNDED
+      // state change when the transition actually happens — i.e. when
+      // the pre-state was MATCHED. Otherwise the WebSocket would briefly
+      // show REFUNDED on top of CANCELLED for the same intent.
+      const before = await inner.getIntent(payload.intentHash);
       await inner.markRefunded(payload, client);
-      bus.emit({
-        type: 'StateChange',
-        intentHash: payload.intentHash,
-        newState: 'REFUNDED',
-        txHash: payload.refundTxHash,
-      });
+      if (before?.state === 'MATCHED') {
+        bus.emit({
+          type: 'StateChange',
+          intentHash: payload.intentHash,
+          newState: 'REFUNDED',
+          txHash: payload.refundTxHash,
+        });
+      }
     },
 
     async markAuctioning(payload, client) {

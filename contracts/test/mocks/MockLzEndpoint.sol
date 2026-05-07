@@ -43,6 +43,14 @@ contract MockLzEndpoint {
     ///         path without modelling LayerZero's fee algorithm.
     uint256 public constant FIXED_NATIVE_FEE = 1 wei;
 
+    /// @notice Emitted when `send()` enqueues a message. E2E tests use this
+    ///         to relay messages between two MockLzEndpoint instances on
+    ///         separate Anvil chains (the in-memory `deliverNext()` only
+    ///         works within a single VM).
+    event MessageQueued(
+        uint32 srcEid, uint32 dstEid, address sender, bytes32 receiver, bytes message, uint256 nativeFee
+    );
+
     /// @notice Test helper: register `oapp` as the OApp at `eid`.
     function registerOApp(uint32 eid, address oapp) external {
         oappAt[eid] = oapp;
@@ -93,6 +101,7 @@ contract MockLzEndpoint {
         unchecked {
             ++_nonce;
         }
+        emit MessageQueued(srcEid, _params.dstEid, msg.sender, _params.receiver, _params.message, msg.value);
         return MessagingReceipt({
             guid: keccak256(abi.encode(srcEid, _params.dstEid, _nonce)),
             nonce: _nonce,
@@ -143,6 +152,21 @@ contract MockLzEndpoint {
 
     function pending() external view returns (uint256) {
         return _queue.length;
+    }
+
+    /// @notice Externally-supplied delivery — used by E2E tests to relay a
+    ///         message from one MockLzEndpoint instance (on chain A) to the
+    ///         OApp registered on this instance (chain B). The same
+    ///         `lzReceive` path as `deliverNext()`, but accepts the message
+    ///         shape from the test relayer instead of reading from `_queue`.
+    /// @dev    Permissionless — these mocks live on test networks only.
+    function deliverInbound(uint32 _srcEid, address _sender, bytes32 _receiver, bytes calldata _message) external {
+        address dstOApp = address(uint160(uint256(_receiver)));
+        unchecked {
+            ++_nonce;
+        }
+        Origin memory origin = Origin({ srcEid: _srcEid, sender: bytes32(uint256(uint160(_sender))), nonce: _nonce });
+        ILzReceiver(dstOApp).lzReceive(origin, bytes32(0), _message, address(this), "");
     }
 
     // ---------------- internal ----------------

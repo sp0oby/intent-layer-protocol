@@ -17,8 +17,8 @@ BEGIN;
 --    Contract enum order: None, Pending, Matched, Auctioning, Locked, Settled,
 --    Cancelled, Refunded. NONE is omitted at the DB layer because a row only
 --    exists once the contract has emitted IntentSubmitted (state >= Pending).
-ALTER TABLE intents DROP CONSTRAINT idx_intents_state;
-ALTER TABLE intents ADD CONSTRAINT idx_intents_state CHECK (
+ALTER TABLE intents DROP CONSTRAINT chk_intents_state;
+ALTER TABLE intents ADD CONSTRAINT chk_intents_state CHECK (
     state IN ('PENDING', 'MATCHED', 'AUCTIONING', 'LOCKED', 'SETTLED', 'CANCELLED', 'REFUNDED')
 );
 

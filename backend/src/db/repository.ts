@@ -232,10 +232,18 @@ export function pgRepository(pool: Pool): OrderBookRepository {
     },
 
     async markRefunded(p, client) {
+      // The contract emits IntentRefunded from BOTH cancelIntent (refunding
+      // a Pending/Auctioning escrow) and refundIfLzTimeout (refunding a
+      // stuck Matched escrow). Only the LZ-timeout path should transition
+      // to REFUNDED; the cancel path already set state = CANCELLED via
+      // IntentCancelled. We gate the state change to state = 'MATCHED'
+      // here so the wrong transition cannot overwrite a terminal state.
+      // Tx hash + settled_at are recorded regardless so the frontend can
+      // show the refund tx for both paths.
       await exec(client, (c) =>
         c.query(
           `UPDATE intents
-              SET state = 'REFUNDED',
+              SET state = CASE WHEN state = 'MATCHED' THEN 'REFUNDED' ELSE state END,
                   settled_at = to_timestamp($2),
                   settle_tx_hash = $3
             WHERE intent_hash = $1`,
