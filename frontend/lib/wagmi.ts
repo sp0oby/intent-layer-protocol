@@ -1,11 +1,16 @@
 import {createConfig, http, injected} from 'wagmi';
 import {coinbaseWallet, metaMask, safe, walletConnect} from 'wagmi/connectors';
 import {base, baseSepolia, mainnet, sepolia} from 'wagmi/chains';
+import {localAnvilBase, localAnvilEth} from './chains';
 
 const sepoliaRpc = process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL ?? 'https://rpc.sepolia.org';
 const baseSepoliaRpc = process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL ?? 'https://sepolia.base.org';
 const mainnetRpc = process.env.NEXT_PUBLIC_MAINNET_RPC_URL ?? 'https://eth.llamarpc.com';
 const baseRpc = process.env.NEXT_PUBLIC_BASE_RPC_URL ?? 'https://mainnet.base.org';
+// Local Anvil pair — defaults match the Stage 4 E2E ports (38545 / 38546).
+// Override via NEXT_PUBLIC_LOCAL_*_RPC_URL when running standalone Anvils.
+const localEthRpc = process.env.NEXT_PUBLIC_LOCAL_ETH_RPC_URL ?? 'http://127.0.0.1:38545';
+const localBaseRpc = process.env.NEXT_PUBLIC_LOCAL_BASE_RPC_URL ?? 'http://127.0.0.1:38546';
 
 const wcProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
 
@@ -42,12 +47,14 @@ const connectors = [
 ];
 
 export const wagmiConfig = createConfig({
-  chains: [sepolia, baseSepolia, mainnet, base],
+  chains: [sepolia, baseSepolia, mainnet, base, localAnvilEth, localAnvilBase],
   connectors,
   transports: {
     [sepolia.id]: http(sepoliaRpc),
     [baseSepolia.id]: http(baseSepoliaRpc),
     [mainnet.id]: http(mainnetRpc),
     [base.id]: http(baseRpc),
+    [localAnvilEth.id]: http(localEthRpc),
+    [localAnvilBase.id]: http(localBaseRpc),
   },
 });

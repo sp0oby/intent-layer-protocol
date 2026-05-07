@@ -48,6 +48,23 @@ const USDC_BASE = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 const USDC_SEPOLIA = '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238';
 const USDC_BASE_SEPOLIA = '0x036CbD53842c5426634e7929541eC2318f3dCF7e';
 
+// Local Anvil — addresses are deterministic when the Stage 4 deploy
+// script (backend/tests/e2e/helpers/deploy-stack.ts) runs against a
+// freshly-spawned Anvil. The script's nonce sequence:
+//   nonce 0  → MockLzEndpoint
+//   nonce 1  → ChainPeerRegistry
+//   nonces 2, 3 → registry config calls
+//   nonce 4  → IntentSettler        (used by lib/contracts.ts)
+//   nonce 5  → registerOApp call
+//   nonce 6  → SolverAuction        (used by lib/contracts.ts)
+//   nonce 7  → setSolverAuction call
+//   nonce 8  → MockERC20 USDC       (this address)
+// Both Anvils run the same script from the same deployer so the values
+// are identical on chain 31337 and chain 31338. Override either via
+// NEXT_PUBLIC_LOCAL_USDC_ADDRESS if running a custom deploy.
+const USDC_LOCAL_ANVIL = (process.env.NEXT_PUBLIC_LOCAL_USDC_ADDRESS ??
+  '0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6') as `0x${string}`;
+
 const TOKENS_BY_CHAIN: Record<SupportedChainId, Token[]> = {
   // Ethereum mainnet — chain id 1
   1: [
@@ -100,6 +117,28 @@ const TOKENS_BY_CHAIN: Record<SupportedChainId, Token[]> = {
       isNative: false,
     },
   ],
+  // Local Anvil — Eth half (matches Stage 4 E2E `ETH_CHAIN_ID = 31337`)
+  31337: [
+    ETH(),
+    {
+      symbol: 'USDC',
+      address: USDC_LOCAL_ANVIL,
+      decimals: 6,
+      name: 'USDC (Local Anvil)',
+      isNative: false,
+    },
+  ],
+  // Local Anvil — Base half (matches Stage 4 E2E `BASE_CHAIN_ID = 31338`)
+  31338: [
+    ETH(),
+    {
+      symbol: 'USDC',
+      address: USDC_LOCAL_ANVIL,
+      decimals: 6,
+      name: 'USDC (Local Anvil)',
+      isNative: false,
+    },
+  ],
 };
 
 export function tokensForChain(chainId: number | undefined): Token[] {
@@ -108,12 +147,15 @@ export function tokensForChain(chainId: number | undefined): Token[] {
 }
 
 /** The opposite chain in the same Phase 1 corridor (mainnet ↔ mainnet,
- *  testnet ↔ testnet). Returns undefined for unsupported chains. */
+ *  testnet ↔ testnet, local Anvil pair ↔ each other). Returns undefined
+ *  for unsupported chains. */
 export function partnerChainOf(chainId: number | undefined): SupportedChainId | undefined {
   if (chainId === 1) return 8453;
   if (chainId === 8453) return 1;
   if (chainId === 11155111) return 84532;
   if (chainId === 84532) return 11155111;
+  if (chainId === 31337) return 31338;
+  if (chainId === 31338) return 31337;
   return undefined;
 }
 

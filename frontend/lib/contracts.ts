@@ -23,6 +23,18 @@ const env = (name: string): `0x${string}` => {
   return value as `0x${string}`;
 };
 
+const envWithDefault = (name: string, defaultAddr: `0x${string}`): `0x${string}` => {
+  const value = process.env[name];
+  return (value ?? defaultAddr) as `0x${string}`;
+};
+
+// Local Anvil deterministic deploy addresses — match the nonce sequence
+// in backend/tests/e2e/helpers/deploy-stack.ts. Override any of these
+// via NEXT_PUBLIC_LOCAL_*_ADDRESS env when running a custom deploy.
+const LOCAL_INTENT_SETTLER = '0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9' as const;
+const LOCAL_SOLVER_AUCTION = '0x0165878A594ca255338adfa4d48449f69242Eb8F' as const;
+const LOCAL_CHAIN_PEER_REGISTRY = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512' as const;
+
 export interface ChainContracts {
   chainId: number;
   intentSettler: `0x${string}`;
@@ -61,6 +73,28 @@ export const CONTRACTS_BY_CHAIN: Record<number, ChainContracts> = {
     intentSettler: env('NEXT_PUBLIC_BASE_SEPOLIA_SETTLER_ADDRESS'),
     solverAuction: env('NEXT_PUBLIC_BASE_SEPOLIA_SOLVER_AUCTION_ADDRESS'),
     chainPeerRegistry: env('NEXT_PUBLIC_BASE_SEPOLIA_CHAIN_PEER_REGISTRY_ADDRESS'),
+  },
+  // Local Anvil — Eth half (matches Stage 4 E2E ETH_CHAIN_ID 31337).
+  // Defaults are the deterministic deploy-stack.ts addresses; override
+  // via NEXT_PUBLIC_LOCAL_ETH_*_ADDRESS for custom deploys.
+  31337: {
+    chainId: 31337,
+    intentSettler: envWithDefault('NEXT_PUBLIC_LOCAL_ETH_SETTLER_ADDRESS', LOCAL_INTENT_SETTLER),
+    solverAuction: envWithDefault('NEXT_PUBLIC_LOCAL_ETH_SOLVER_AUCTION_ADDRESS', LOCAL_SOLVER_AUCTION),
+    chainPeerRegistry: envWithDefault(
+      'NEXT_PUBLIC_LOCAL_ETH_CHAIN_PEER_REGISTRY_ADDRESS',
+      LOCAL_CHAIN_PEER_REGISTRY
+    ),
+  },
+  // Local Anvil — Base half (matches Stage 4 E2E BASE_CHAIN_ID 31338).
+  31338: {
+    chainId: 31338,
+    intentSettler: envWithDefault('NEXT_PUBLIC_LOCAL_BASE_SETTLER_ADDRESS', LOCAL_INTENT_SETTLER),
+    solverAuction: envWithDefault('NEXT_PUBLIC_LOCAL_BASE_SOLVER_AUCTION_ADDRESS', LOCAL_SOLVER_AUCTION),
+    chainPeerRegistry: envWithDefault(
+      'NEXT_PUBLIC_LOCAL_BASE_CHAIN_PEER_REGISTRY_ADDRESS',
+      LOCAL_CHAIN_PEER_REGISTRY
+    ),
   },
 };
 
