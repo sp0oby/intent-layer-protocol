@@ -282,4 +282,4 @@ No loose ends in Stage 2 itself. **Stage 1 + Stage 2 together are now logically 
 | **Version** | 1.0 |
 | **Last updated** | 2026-05-06 |
 | **Status** | Internal review of Stage 2 — superseded once Stage 3 lands |
-| **Reviewer** | Internal (maintainer + Claude) |
+| **Reviewer** | Internal (maintainer + AI-assisted review) |

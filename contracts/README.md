@@ -32,7 +32,7 @@
 | [`SolverAuction.t.sol`](test/SolverAuction.t.sol) | 21 | window setup, signed proposals, ranking, finalisation, gating, `getProposals` aggregate view |
 | [`ChainPeerRegistry.t.sol`](test/ChainPeerRegistry.t.sol) | 6 | owner / EID / route configuration |
 | [`Integration.t.sol`](test/Integration.t.sol) | 3 | stack-deploys, submit-then-cancel, submit-match-auction lifecycle |
-| [`mocks/`](test/mocks/) | — | `MockERC20`, `MockUSDT` (non-bool returns), `MockLzEndpoint` |
+| [`mocks/`](test/mocks/) | — | `MockERC20`, `MockUSDT` (non-bool returns), `MockLzEndpoint` (test-only `MessageQueued` event + `deliverInbound()` helper let backend E2E tests relay messages between two endpoint instances on separate Anvil chains) |
 
 **Total: 100 unit/fuzz/integration tests + 6 stateful invariants × 256 runs × ~500 calls. All passing.**
 
@@ -41,7 +41,7 @@
 - **`forge build`** — clean (45 contracts, no errors)
 - **`forge test`** — 100/100 passing
 - **`forge fmt --check`** — clean
-- **Slither** (`--filter-paths "lib/|test/" --exclude-low --exclude-informational`) — **0 medium+ findings across 41 contracts** (after R-03 false-positive suppression and R-01/R-02/R-16/R-17/R-18 fixes from the Stage 3 final review + Opus security pass)
+- **Slither** (`--filter-paths "lib/|test/" --exclude-low --exclude-informational`) — **0 medium+ findings across 41 contracts** (after R-03 false-positive suppression and R-01/R-02/R-16/R-17/R-18 fixes from the Stage 3 final review + follow-up security pass)
 
 ## Configuration
 

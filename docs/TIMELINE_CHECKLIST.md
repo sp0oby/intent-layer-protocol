@@ -107,6 +107,6 @@ Operations
 
 | | |
 |:---|:---|
-| **Version** | 1.1 |
+| **Version** | 1.2 |
 | **Last updated** | 2026-05-07 |
-| **Status** | Weeks 1-6 contract scope complete; Stage 4 (backend services) is the next milestone |
+| **Status** | Weeks 1-6 contract scope complete; Stage 4 (backend services) feature-complete locally with E2E coverage; Stage 5 (frontend wiring) is the next milestone |

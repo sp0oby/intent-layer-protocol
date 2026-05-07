@@ -281,4 +281,4 @@ Stage 3 cleanly closes the remaining Stage 1 medium findings and adds a complete
 | **Version** | 1.0 |
 | **Last updated** | 2026-05-06 |
 | **Status** | Internal review of Stage 3 — superseded once Stage 4 lands |
-| **Reviewer** | Internal (maintainer + Claude) |
+| **Reviewer** | Internal (maintainer + AI-assisted review) |

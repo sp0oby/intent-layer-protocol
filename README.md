@@ -7,7 +7,7 @@
 
 **Cross-chain intent settlement for Ethereum ↔ Base** — users express a single high-level swap goal; the system fulfills it via **peer-to-peer intent matching** when possible, or a **competitive solver auction** when not.
 
-This repository contains the **protocol specification**, a **working dev skeleton** (contracts, backend API, web app, CI, Docker), and room for production hardening before any mainnet deployment.
+This repository contains the **protocol specification**, the **on-chain protocol** (Foundry — Stages 0–3 complete + follow-up security pass; 100/100 tests, Slither clean), the **off-chain backend** (Stage 4 feature-complete: indexer, matching loop, auction orchestrator, REST + WebSocket API, reference solver bot — 101/101 vitest unit + 4/4 E2E with two real Anvils), a **frontend skeleton** wired to a mock API (Stage 5 wiring is the next milestone), and the CI / Docker / `.env` scaffolding to run it all locally. External audit and testnet/mainnet deployment remain — see [`docs/TIMELINE_CHECKLIST.md`](docs/TIMELINE_CHECKLIST.md).
 
 ---
 
@@ -57,12 +57,12 @@ This is why we put the P2P path *first* and the bonded solver auction *second*. 
 | Area | State |
 |------|--------|
 | **Specification** | Protocol design and planning docs live under [`docs/`](#documentation) |
-| **Smart contracts** | **Stages 1 + 2 + 3 complete + follow-up security pass** — `IntentSettler` is a full LayerZero V2 OApp: EIP-712 hashing, native-ETH + ERC-20 (incl. USDT-style) escrow, `cancelIntent`, `executeMatching` with `_lzSend`, `_lzReceive` dispatching `EXECUTE_MATCH` / `CONFIRM`, `refundIfLzTimeout` (6 hr recovery), `openAuction`, `setSolverAuction`. `SolverAuction` integrated. Match validation (token + chain + both-sides amount minimums) is enforced **on the destination chain using only trusted data** — the matcher cannot bypass `minDestAmount` or `destToken`. CONFIRM leg has the same source-EID guard as EXECUTE_MATCH. User ETH escrow is segregated from operator pre-fund and can never be debited for LayerZero fees. **96 tests pass (incl. cross-chain round-trip, dest-side validation, confirm-leg rejection, escrow-floor invariant). Slither clean.** |
-| **Backend** | **Stage 4 feature-complete (locally)** — multi-chain event indexer with resumable cursor, DB-backed matching loop with relayer dispatch, auction orchestrator (open + finalize), REST + WebSocket API, ECDSA proposal verification, reference solver bot, runtime composition. **100 vitest pass, `tsc --noEmit` clean.** End-to-end integration against deployed contracts pending. |
+| **Smart contracts** | **Stages 1 + 2 + 3 complete + follow-up security pass** — `IntentSettler` is a full LayerZero V2 OApp: EIP-712 hashing, native-ETH + ERC-20 (incl. USDT-style) escrow, `cancelIntent`, `executeMatching` with `_lzSend`, `_lzReceive` dispatching `EXECUTE_MATCH` / `CONFIRM`, `refundIfLzTimeout` (6 hr recovery), `openAuction`, `setSolverAuction`. `SolverAuction` integrated. Match validation (token + chain + both-sides amount minimums) is enforced **on the destination chain using only trusted data** — the matcher cannot bypass `minDestAmount` or `destToken`. CONFIRM leg has the same source-EID guard as EXECUTE_MATCH. User ETH escrow is segregated from operator pre-fund and can never be debited for LayerZero fees. **100/100 tests (94 unit/fuzz/integration + 6 stateful invariants × 256 runs × ~500 calls ≈ 768k random sequences). Slither: 0 medium+ findings across 41 contracts.** |
+| **Backend** | **Stage 4 feature-complete** — multi-chain event indexer with resumable cursor, DB-backed matching loop with relayer dispatch, auction orchestrator (open + finalize), REST + WebSocket API, ECDSA proposal verification, reference solver bot, runtime composition. **101/101 vitest unit + 4/4 E2E** (E2E spawns two real Anvil instances and drives a full P2P round-trip with cross-chain LayerZero relay). `tsc --noEmit` clean. |
 | **Frontend** | Next.js app with wallet connect (wagmi), swap + intent status flows wired to a **mock API** |
 | **CI** | GitHub Actions: Foundry + backend `tsc`/tests + frontend build ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) |
 
-Treat on-chain code as **templates to extend**, not audited production assets.
+The on-chain code is **internally audited and locally tested** but has not yet been through an external audit, testnet, or mainnet deployment. Treat it accordingly.
 
 ---
 
@@ -71,7 +71,7 @@ Treat on-chain code as **templates to extend**, not audited production assets.
 | Path | Purpose |
 |------|---------|
 | [`contracts/`](contracts/) | Foundry — **`ChainPeerRegistry`**, `IntentSettler`, `SolverAuction`, interfaces, libraries ([`contracts/README.md`](contracts/README.md)) |
-| [`backend/`](backend/) | TypeScript API, matcher stub, migrations — [`backend/README.md`](backend/README.md) |
+| [`backend/`](backend/) | TypeScript API, multi-chain indexer, DB-backed matching loop, auction orchestrator, WebSocket, reference solver bot — [`backend/README.md`](backend/README.md) |
 | [`frontend/`](frontend/) | Next.js App Router client — [`frontend/README.md`](frontend/README.md) |
 | [`docs/`](docs/) | [Protocol documentation](#documentation) (whitepaper, architecture, MVP, risk, stack, research, timeline) and maintainer guides (GitHub Projects / issues) |
 | [`docker-compose.yml`](docker-compose.yml) | Local Postgres, Redis, Anvil |
@@ -148,7 +148,7 @@ cd contracts && forge install foundry-rs/forge-std --no-git --shallow
 | Package | Commands |
 |---------|----------|
 | **Contracts** | `forge build`, `forge test` (from [`contracts/`](contracts/)) |
-| **Backend** | `npm run lint` (TypeScript check), `npm test`, `npm run dev` |
+| **Backend** | `npm run lint` (TypeScript check), `npm test`, `npm run test:e2e` (spawns Anvil), `npm run dev`, `npm run extract-abis` (refresh `src/abis/` from `contracts/out/`) |
 | **Frontend** | `npm run lint`, `npm run build`, `npm run dev` |
 | **CI** | See [`.github/workflows/ci.yml`](.github/workflows/ci.yml) |
 
@@ -185,10 +185,16 @@ Distributed under the [MIT License](LICENSE).
 ## FAQ
 
 **Should I run `npm audit`?**  
-Yes, periodically — especially before releases. The skeleton may pin versions with known advisories; upgrading (for example **Next.js** patch releases) should be done deliberately with a quick smoke test of the app.
+Yes, periodically — especially before releases. Pinned versions may have known advisories; upgrading (for example **Next.js** patch releases) should be done deliberately with a quick smoke test of the app.
 
-**Are the smart contracts “done”?**  
-No. They are **intentional templates**: interfaces, structs, events, and stub logic so the repo builds and tests run. Escrow, messaging, auctions, and economic security must be implemented and reviewed before any deployment.
+**Are the smart contracts "done"?**  
+**Phase 1 logic is implemented and internally audited.** Escrow (native ETH + ERC-20 incl. USDT-style), EIP-712 hashing, cross-chain LayerZero V2 messaging, solver auction with signed proposals, and timeout-based recovery all exist with **100/100 tests** including a full cross-chain round-trip and ~768k stateful invariant calls; **Slither shows 0 medium+ findings**. What remains before mainnet: **external audit** (Trail of Bits / OpenZeppelin / Spearbit class), **Echidna / Mythril / Halmos** symbolic + fuzz passes (Stage 7), **testnet deployment** (Stage 8), and the canonical multi-chain peer / registry configuration that comes with it. See [`docs/STAGE_3_FINAL_REVIEW.md`](docs/STAGE_3_FINAL_REVIEW.md) for the full pre-Stage-4 review.
+
+**Is the backend "done"?**  
+**Stage 4 is feature-complete locally.** Multi-chain event indexer with resumable cursor, DB-backed matching loop with relayer dispatch, auction orchestrator (open + finalize), REST + WebSocket API with on-chain `proposalDigest` ECDSA verification, reference solver bot, and runtime composition all exist with **101/101 vitest unit + 4/4 E2E** (the E2E spawns two real Anvil instances and drives a P2P swap end-to-end through a real LayerZero relay between two `MockLzEndpoint` instances). Production hardening (monitoring, alerting, multi-instance HA) is Stage 9.
+
+**Is the frontend "done"?**  
+No — the frontend is the next milestone (Stage 5). Today it's a Next.js skeleton with wallet connect (wagmi) and pages wired to a mock API. Real contract calls, ERC-20 approval flow, real-time intent status via WebSocket, and the transaction-history page land in Stage 5.
 
 **Who maintains this?**  
 Project founder: **[@sp0oby](https://github.com/sp0oby)**. Contributors welcome per [CONTRIBUTING.md](CONTRIBUTING.md).

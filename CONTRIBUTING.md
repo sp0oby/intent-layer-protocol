@@ -19,9 +19,10 @@ Thank you for helping build cross-chain intent infrastructure. This document exp
 See the [README](README.md) **Quickstart**. Minimum checklist:
 
 1. `docker compose up -d` for Postgres / Redis / Anvil (optional for `backend` **Vitest** today, but recommended so `/health` can report `database: true` and matches production-like setup).
-2. `cd contracts && forge test`
-3. `cd backend && npm install && npm run lint && npm test`
-4. `cd frontend && npm install && npm run lint && npm run build`
+2. `cd contracts && forge test` (100/100 expected — see [`contracts/README.md`](contracts/README.md))
+3. `cd backend && npm install && npm run lint && npm test` (101/101 unit tests)
+4. `cd backend && npm run test:e2e` (4/4 E2E — spawns Anvil child processes; requires `forge build` first to populate `contracts/out/`)
+5. `cd frontend && npm install && npm run lint && npm run build`
 
 ---
 

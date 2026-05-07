@@ -513,4 +513,4 @@ status above (M-02, M-03, M-04) and tied to the relevant later stage.
 | **Version** | 1.1 |
 | **Last updated** | 2026-05-06 |
 | **Status** | Internal review of Stage 1 — superseded once Stage 2 lands |
-| **Reviewer** | Internal (maintainer + Claude) |
+| **Reviewer** | Internal (maintainer + AI-assisted review) |

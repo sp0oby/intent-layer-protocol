@@ -474,4 +474,4 @@ The promise from M-05 — "operator pre-fund failure = funds delayed, not lost" 
 | **Version** | 1.1 |
 | **Last updated** | 2026-05-06 |
 | **Status** | Final review + follow-up security pass — stage gate to Stage 4 |
-| **Reviewer** | Internal (maintainer + Claude) |
+| **Reviewer** | Internal (maintainer + AI-assisted review) |

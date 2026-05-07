@@ -119,15 +119,16 @@ Display:
 ### Intent Indexer
 
 **Responsibilities:**
-- Listen to IntentSubmitted events on Ethereum
-- Listen to IntentSubmitted events on Base
-- Store in persistent order book (PostgreSQL)
-- Maintain order book state
+- Subscribe to `IntentSubmitted`, `IntentCancelled`, `IntentMatched`, `AuctionOpened`, `IntentLocked` (Phase 2B reservation), `IntentSettled`, `IntentRefunded` on every supported chain's `IntentSettler`.
+- Subscribe to `AuctionWindowSet`, `ProposalSubmitted`, `WinnerSelected` on every supported chain's `SolverAuction`.
+- Persist into Postgres via a typed `OrderBookRepository` (one place that owns SQL).
+- Resumable across restarts via `indexer_cursors (chain_id, contract_address, last_processed_block)` — the cursor advances inside the same transaction as the row writes so a crash mid-batch is safe to retry.
+- Apply a per-chain confirmation depth at read time (Eth 12, Base 1 — same numbers LayerZero V2's default DVN trusts) so the off-chain view never sees a state the protocol hasn't trusted on-chain.
 
 **Technology:**
-- Blockchain event listeners (ethers.js)
-- Order book database (PostgreSQL)
-- Real-time updates (WebSocket)
+- Polling `provider.getLogs` in bounded windows (no `subscribe` because back-fill on restart needs the polled path).
+- ethers.js v6 + `pg` (no ORM — keeps SQL explicit at the boundary).
+- WebSocket fan-out (`ws`) for real-time UI updates, fed by an in-process `IntentEventBus` that the publishing repository writes to.
 
 ### Matching Engine
 
@@ -232,6 +233,11 @@ contract IntentSettler is IIntentSettler, EIP712, ReentrancyGuard {
     event AuctionOpened(bytes32 indexed intentHash, uint256 auctionDeadline);
     event IntentLocked(bytes32 indexed intentHash);
     event IntentSettled(bytes32 indexed intentHash, address indexed recipient, uint256 amount);
+    // `IntentRefunded` fires on BOTH cancel (alongside IntentCancelled) and
+    // LZ-timeout recovery. Indexers must NOT unconditionally transition
+    // state to Refunded on this event — only the LZ-timeout path actually
+    // moves state from Matched to Refunded; the cancel path already moved
+    // it to Cancelled. The off-chain handler should gate on prior state.
     event IntentRefunded(bytes32 indexed intentHash, address indexed recipient, uint256 amount);
 
     // Core functions — `executeMatching` takes ONLY the two intent hashes.
