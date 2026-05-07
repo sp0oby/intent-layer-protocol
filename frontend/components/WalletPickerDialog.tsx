@@ -1,6 +1,7 @@
 'use client';
 
 import {useEffect} from 'react';
+import {Globe, QrCode, Shield, Wallet} from 'lucide-react';
 import {useConnect, type Connector} from 'wagmi';
 import {toast} from 'sonner';
 import {
@@ -82,6 +83,22 @@ export function WalletPickerDialog({
   );
 }
 
+/** Wireframe-phase icon. Monochrome lucide glyph keyed by connector type
+ *  so users still get visual differentiation in the picker without
+ *  pulling in branded wallet logos before the brand decisions land.
+ *
+ *  React 19's `react-hooks/static-components` forbids creating a component
+ *  identifier during render, so the JSX is selected inline rather than
+ *  returned as a `typeof Component`. */
+function ConnectorIcon({connector}: {connector: Connector}) {
+  const id = connector.id.toLowerCase();
+  const className = 'size-3.5 text-muted-foreground';
+  if (id.includes('walletconnect')) return <QrCode className={className} aria-hidden="true" />;
+  if (id.includes('safe')) return <Shield className={className} aria-hidden="true" />;
+  if (id === 'injected') return <Globe className={className} aria-hidden="true" />;
+  return <Wallet className={className} aria-hidden="true" />;
+}
+
 function ConnectorRow({
   connector,
   pending,
@@ -93,7 +110,6 @@ function ConnectorRow({
   disabled: boolean;
   onSelect: () => void;
 }) {
-  const icon = (connector as Connector & {icon?: string}).icon;
   return (
     <Button
       variant="outline"
@@ -103,16 +119,7 @@ function ConnectorRow({
       className="h-12 justify-start gap-3 text-sm"
     >
       <span className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border/60 bg-muted">
-        {icon ? (
-          // Connector icons arrive as data URLs from the wallet SDK — Next/Image
-          // can't optimise data URIs anyway, so a plain <img> is the right tool.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={icon} alt="" className="size-full object-cover" aria-hidden="true" />
-        ) : (
-          <span className="text-[10px] uppercase text-muted-foreground">
-            {connector.name.slice(0, 2)}
-          </span>
-        )}
+        <ConnectorIcon connector={connector} />
       </span>
       <span className="flex-1 text-left">{connector.name}</span>
       {pending ? <span className="text-xs text-muted-foreground">Connecting…</span> : null}
