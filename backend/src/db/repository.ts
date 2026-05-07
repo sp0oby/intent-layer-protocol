@@ -13,6 +13,7 @@
  */
 
 import type {Pool, PoolClient, QueryResult} from 'pg';
+import type {IntentRecord, IntentState} from '../types/intent.js';
 
 export interface IntentEventPayload {
   intentHash: string;
@@ -82,8 +83,17 @@ export interface CursorAdvance {
 }
 
 /**
- * The narrow surface the indexer / API depend on. The Postgres-backed
- * implementation lives in `pgRepository`; tests inject a fake.
+ * The narrow surface the indexer / matching loop / API depend on. The
+ * Postgres-backed implementation lives in `pgRepository`; tests inject a fake.
+ *
+ * Concurrency note: there is no off-chain "claim" lock. The on-chain
+ * `executeMatching` is the canonical match — its state machine rejects a
+ * second match attempt on the same intent atomically. The matching loop
+ * uses a process-local in-flight set to avoid re-submitting against
+ * itself between the DB read and the chain settlement, but two matcher
+ * instances pointed at the same DB will race on the chain (only one tx
+ * succeeds; the other reverts and the loser loses gas, no funds at risk).
+ * Production deployment runs a single matcher.
  */
 export interface OrderBookRepository {
   insertIntent(payload: IntentEventPayload, client?: PoolClient): Promise<void>;
@@ -97,6 +107,13 @@ export interface OrderBookRepository {
   readCursor(chainId: number, contractAddress: string): Promise<number | null>;
   advanceCursor(advance: CursorAdvance, client?: PoolClient): Promise<void>;
   withTransaction<T>(fn: (client: PoolClient) => Promise<T>): Promise<T>;
+
+  /** Read all match-eligible intents (state in PENDING / AUCTIONING and
+   *  deadline > nowSec) on the given chain. Used by the matching loop. */
+  listMatchEligible(sourceChainId: number, nowSec: number): Promise<IntentRecord[]>;
+
+  /** Single-intent lookup by hash (for the API and for matched-pair lookup). */
+  getIntent(intentHash: string): Promise<IntentRecord | null>;
 }
 
 const toBuffer = (hex: string): Buffer => {
@@ -295,6 +312,74 @@ export function pgRepository(pool: Pool): OrderBookRepository {
         client.release();
       }
     },
+
+    async listMatchEligible(sourceChainId, nowSec) {
+      const result: QueryResult<IntentRow> = await pool.query(
+        `SELECT intent_hash, user_address, refund_to, source_chain_id, source_token,
+                source_amount, dest_chain_id, dest_token, min_dest_amount, deadline,
+                nonce, state, submitted_at_block_ts, match_timestamp, auction_deadline
+           FROM intents
+          WHERE source_chain_id = $1
+            AND state IN ('PENDING', 'AUCTIONING')
+            AND deadline > $2`,
+        [sourceChainId, nowSec]
+      );
+      return result.rows.map(rowToIntentRecord);
+    },
+
+    async getIntent(intentHash) {
+      const result: QueryResult<IntentRow> = await pool.query(
+        `SELECT intent_hash, user_address, refund_to, source_chain_id, source_token,
+                source_amount, dest_chain_id, dest_token, min_dest_amount, deadline,
+                nonce, state, submitted_at_block_ts, match_timestamp, auction_deadline
+           FROM intents
+          WHERE intent_hash = $1`,
+        [toBuffer(lower(intentHash))]
+      );
+      if (result.rowCount === 0) return null;
+      return rowToIntentRecord(result.rows[0]);
+    },
+  };
+}
+
+interface IntentRow {
+  intent_hash: Buffer;
+  user_address: Buffer;
+  refund_to: Buffer;
+  source_chain_id: number;
+  source_token: Buffer;
+  source_amount: string;
+  dest_chain_id: number;
+  dest_token: Buffer;
+  min_dest_amount: string;
+  deadline: string;
+  nonce: string;
+  state: IntentState;
+  submitted_at_block_ts: string | null;
+  match_timestamp: string | null;
+  auction_deadline: string | null;
+}
+
+const bufToHex = (buf: Buffer): string => '0x' + buf.toString('hex');
+const numStr = (val: string | null): number | undefined => (val === null ? undefined : Number(val));
+
+function rowToIntentRecord(row: IntentRow): IntentRecord {
+  return {
+    intentHash: bufToHex(row.intent_hash),
+    user: bufToHex(row.user_address),
+    refundTo: bufToHex(row.refund_to),
+    sourceChainId: row.source_chain_id,
+    sourceToken: bufToHex(row.source_token),
+    sourceAmount: row.source_amount,
+    destChainId: row.dest_chain_id,
+    destToken: bufToHex(row.dest_token),
+    minDestAmount: row.min_dest_amount,
+    deadline: Number(row.deadline),
+    nonce: row.nonce,
+    state: row.state,
+    submittedAtBlockTs: numStr(row.submitted_at_block_ts),
+    matchTimestamp: numStr(row.match_timestamp),
+    auctionDeadline: numStr(row.auction_deadline),
   };
 }
 
