@@ -114,6 +114,19 @@ export interface OrderBookRepository {
 
   /** Single-intent lookup by hash (for the API and for matched-pair lookup). */
   getIntent(intentHash: string): Promise<IntentRecord | null>;
+
+  /** Intents currently PENDING whose submission timestamp + auctionDelaySec
+   *  has passed. The orchestrator opens an auction on each. */
+  listEligibleForAuctionOpen(
+    sourceChainId: number,
+    nowSec: number,
+    auctionDelaySec: number
+  ): Promise<IntentRecord[]>;
+
+  /** AUCTIONING intents whose auction_deadline < nowSec. The orchestrator
+   *  calls executeWinningProposal on each — the on-chain contract reverts
+   *  if the auction has no proposals, so this is safe to call eagerly. */
+  listEligibleForAuctionFinalize(sourceChainId: number, nowSec: number): Promise<IntentRecord[]>;
 }
 
 const toBuffer = (hex: string): Buffer => {
@@ -338,6 +351,37 @@ export function pgRepository(pool: Pool): OrderBookRepository {
       );
       if (result.rowCount === 0) return null;
       return rowToIntentRecord(result.rows[0]);
+    },
+
+    async listEligibleForAuctionOpen(sourceChainId, nowSec, auctionDelaySec) {
+      const result: QueryResult<IntentRow> = await pool.query(
+        `SELECT intent_hash, user_address, refund_to, source_chain_id, source_token,
+                source_amount, dest_chain_id, dest_token, min_dest_amount, deadline,
+                nonce, state, submitted_at_block_ts, match_timestamp, auction_deadline
+           FROM intents
+          WHERE source_chain_id = $1
+            AND state = 'PENDING'
+            AND submitted_at_block_ts IS NOT NULL
+            AND submitted_at_block_ts + $3 < $2
+            AND deadline > $2`,
+        [sourceChainId, nowSec, auctionDelaySec]
+      );
+      return result.rows.map(rowToIntentRecord);
+    },
+
+    async listEligibleForAuctionFinalize(sourceChainId, nowSec) {
+      const result: QueryResult<IntentRow> = await pool.query(
+        `SELECT intent_hash, user_address, refund_to, source_chain_id, source_token,
+                source_amount, dest_chain_id, dest_token, min_dest_amount, deadline,
+                nonce, state, submitted_at_block_ts, match_timestamp, auction_deadline
+           FROM intents
+          WHERE source_chain_id = $1
+            AND state = 'AUCTIONING'
+            AND auction_deadline IS NOT NULL
+            AND auction_deadline < $2`,
+        [sourceChainId, nowSec]
+      );
+      return result.rows.map(rowToIntentRecord);
     },
   };
 }
