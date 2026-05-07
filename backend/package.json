@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "local-stack": "tsx scripts/local-stack.ts",
     "lint": "tsc -p tsconfig.json --noEmit",
     "extract-abis": "node scripts/extract-abis.mjs"
   },
