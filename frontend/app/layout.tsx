@@ -2,11 +2,12 @@ import type {Metadata} from 'next';
 import localFont from 'next/font/local';
 import './globals.css';
 import {Providers} from './providers';
-import { Geist } from "next/font/google";
-import { cn } from "@/lib/utils";
+import {AppShell} from '@/components/AppShell';
+import {Toaster} from '@/components/ui/sonner';
 
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
-
+// Geist VF + GeistMono are vendored under app/fonts/ — no Google Fonts
+// dependency at runtime. Variables are referenced by Tailwind via the
+// --font-sans / --font-mono custom-property exposed in globals.css.
 const geistSans = localFont({
   src: './fonts/GeistVF.woff',
   variable: '--font-geist-sans',
@@ -20,7 +21,7 @@ const geistMono = localFont({
 
 export const metadata: Metadata = {
   title: 'Intent Layer Protocol',
-  description: 'Cross-chain intent matching — Ethereum ↔ Base (MVP skeleton)',
+  description: 'Cross-chain intent matching — Ethereum ↔ Base.',
 };
 
 export default function RootLayout({
@@ -29,9 +30,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("font-sans", geist.variable)}>
+    <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} min-h-screen antialiased`}>
-        <Providers>{children}</Providers>
+        <Providers>
+          <AppShell>{children}</AppShell>
+        </Providers>
+        <Toaster />
       </body>
     </html>
   );

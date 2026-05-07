@@ -1,15 +1,22 @@
 import Link from 'next/link';
 import {IntentStatusClient} from './status-client';
 
-type PageProps = {params: {id: string}};
+// Next 16 made dynamic-route `params` a Promise — must be awaited inside
+// an async server component. The previous synchronous destructure gave
+// us `id === undefined` at runtime.
+type PageProps = {params: Promise<{id: string}>};
 
-export default function IntentStatusPage({params}: PageProps) {
+export default async function IntentStatusPage({params}: PageProps) {
+  const {id} = await params;
   return (
-    <div className="mx-auto min-h-screen max-w-xl px-6 py-12">
-      <Link href="/swap" className="text-sm text-neutral-500 hover:underline">
+    <section className="mx-auto max-w-xl px-6 py-12">
+      <Link
+        href="/swap"
+        className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+      >
         ← Back to swap
       </Link>
-      <IntentStatusClient id={params.id} />
-    </div>
+      <IntentStatusClient id={id} />
+    </section>
   );
 }
