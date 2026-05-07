@@ -16,11 +16,9 @@ export default function Home() {
         </p>
       </motion.div>
       <div className="flex flex-wrap gap-3">
-        <Button asChild>
-          <Link href="/swap">Open swap</Link>
-        </Button>
-        <Button variant="outline" asChild>
-          <Link href="/intent/demo-intent">Sample intent status</Link>
+        <Button render={<Link href="/swap" />}>Open swap</Button>
+        <Button variant="outline" render={<Link href="/intent/demo-intent" />}>
+          Sample intent status
         </Button>
       </div>
     </main>

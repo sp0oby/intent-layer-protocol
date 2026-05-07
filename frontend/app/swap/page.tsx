@@ -9,7 +9,9 @@ import {useUiStore} from '@/lib/ui-store';
 export default function SwapPage() {
   const lastSubmittedIntentId = useUiStore((s) => s.lastSubmittedIntentId);
   const setLastId = useUiStore((s) => s.setLastSubmittedIntentId);
-  const [stubId, setStubId] = useState(`intent-${Math.random().toString(36).slice(2, 10)}`);
+  // Empty default — the real on-chain form replaces this stub in Stage 5.2.
+  // Math.random() initializer removed to satisfy the React 19 purity rule.
+  const [stubId, setStubId] = useState('');
 
   return (
     <div className="mx-auto flex min-h-screen max-w-xl flex-col gap-8 px-6 py-12">

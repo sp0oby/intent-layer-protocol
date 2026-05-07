@@ -1,61 +1,81 @@
 'use client';
 
-import {useQuery} from '@tanstack/react-query';
+import type {ReactNode} from 'react';
+import {useIntent} from '@/hooks/useIntents';
+import {useIntentStatus} from '@/hooks/useIntentStatus';
 
-type IntentRow = {
-  id: string;
-  state: string;
-  sourceChainId: number;
-  destChainId: number;
-  user: string;
-};
-
-async function fetchIntents(): Promise<IntentRow[]> {
-  const res = await fetch('/api/intents', {cache: 'no-store'});
-  if (!res.ok) {
-    throw new Error('Failed to load intents');
-  }
-  const data = (await res.json()) as {intents: IntentRow[]};
-  return data.intents;
-}
-
+/**
+ * Status display for a single intent. Combines a polled REST query (the
+ * canonical snapshot) with a WebSocket subscription (live state changes).
+ *
+ * Wireframe phase: pure b&w; the proper animated state-machine timeline
+ * lands in Stage 5.3.
+ */
 export function IntentStatusClient({id}: {id: string}) {
-  const {data, isLoading, error} = useQuery({
-    queryKey: ['intents'],
-    queryFn: fetchIntents,
+  const isHash = id.startsWith('0x') && id.length === 66;
+  const {data: intent, isLoading, error} = useIntent(isHash ? id : undefined);
+  const {status: wsStatus, lastEvent} = useIntentStatus({
+    intentHash: isHash ? id : undefined,
   });
-
-  const match = data?.find((i) => i.id === id);
 
   return (
     <div className="mt-8 space-y-4">
       <h1 className="text-2xl font-semibold">Intent status</h1>
-      <p className="font-mono text-sm text-neutral-600 dark:text-neutral-400">{id}</p>
-      {isLoading && <p className="text-sm">Loading mock API…</p>}
-      {error && <p className="text-sm text-red-600">{(error as Error).message}</p>}
-      {match ? (
-        <dl className="grid gap-2 text-sm">
-          <div>
-            <dt className="text-neutral-500">State</dt>
-            <dd className="font-medium">{match.state}</dd>
-          </div>
-          <div>
-            <dt className="text-neutral-500">Route</dt>
-            <dd>
-              {match.sourceChainId} → {match.destChainId}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-neutral-500">User</dt>
-            <dd className="font-mono text-xs">{match.user}</dd>
-          </div>
-        </dl>
-      ) : null}
-      {!isLoading && !match && data ? (
-        <p className="text-sm text-neutral-600">
-          No matching row in dummy API. IDs from `/api/intents` include: {data.map((i) => i.id).join(', ')}.
+      <p className="font-mono text-xs text-muted-foreground">{id}</p>
+
+      {!isHash && (
+        <p className="text-sm text-muted-foreground">
+          Provide a 32-byte intent hash (0x… 64 hex chars). The Stage 5
+          submission flow will route here automatically after a real
+          submitIntent call.
         </p>
-      ) : null}
+      )}
+
+      {isLoading && isHash && <p className="text-sm">Loading…</p>}
+      {error && <p className="text-sm text-destructive">{(error as Error).message}</p>}
+
+      {intent && (
+        <dl className="grid gap-3 text-sm">
+          <Row label="State" value={<span className="font-medium">{intent.state}</span>} />
+          <Row label="Route" value={`${intent.sourceChainId} → ${intent.destChainId}`} />
+          <Row label="User" value={<span className="font-mono text-xs">{intent.user}</span>} />
+          <Row
+            label="Source"
+            value={
+              <span className="font-mono text-xs">
+                {intent.sourceAmount} of {intent.sourceToken}
+              </span>
+            }
+          />
+          <Row
+            label="Min received"
+            value={
+              <span className="font-mono text-xs">
+                {intent.minDestAmount} of {intent.destToken}
+              </span>
+            }
+          />
+        </dl>
+      )}
+
+      <div className="border-t pt-4 text-xs text-muted-foreground">
+        Live: <span className="font-mono">{wsStatus}</span>
+        {lastEvent ? (
+          <>
+            {' '}
+            · last event <span className="font-mono">{lastEvent.type}</span>
+          </>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function Row({label, value}: {label: string; value: ReactNode}) {
+  return (
+    <div>
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd>{value}</dd>
     </div>
   );
 }
