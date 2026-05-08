@@ -29,9 +29,9 @@ Week 5-6 — Auction & Solvers
 - [x] Integrate solver auction flow into matching engine — `AuctionOrchestrator` opens windows after `AUCTION_DELAY` and finalizes via `executeWinningProposal` (Stage 4)
 
 Week 7 — Frontend MVP
-- [ ] Implement React swap UI (Next.js) with MetaMask via wagmi — **Uniswap-style one-click minimal UX**
-- [ ] Show intent lifecycle and links to tx explorers
-- [ ] Connect frontend to backend API and test submission flow
+- [x] Implement React swap UI (Next.js) with MetaMask via wagmi — **Uniswap-style one-click minimal UX** (Stage 5.2 ships the chained approve+submit form on Next 16 / React 19 / Tailwind v4 / shadcn / wagmi v3)
+- [x] Show intent lifecycle and links to tx explorers — animated status timeline ships in 5.3 (per-state explorer links pending tx-hash exposure in IntentRecord, task #67)
+- [ ] Connect frontend to backend API and test submission flow — code complete; end-to-end manual verification blocked by issue #29 (suspected CORS)
 
 Week 8 — Integration & Tests
 - [ ] End-to-end integration tests (Foundry + backend + frontend)
@@ -78,9 +78,9 @@ Backend
 - [ ] End-to-end integration test against deployed contracts on local Anvil (in progress)
 
 Frontend
-- [ ] User can submit intents via wallet (MetaMask)
-- [ ] UI shows real-time intent status and explorer links
-- [ ] User can cancel unmatched intents
+- [ ] User can submit intents via wallet (MetaMask) — code complete (Stage 5.2 chained approve + submit form, multi-wallet picker); end-to-end manual verification blocked by issue #29
+- [ ] UI shows real-time intent status and explorer links — code complete (Stage 5.3 animated state-machine timeline + WebSocket subscription); explorer links pending tx-hash exposure in IntentRecord (task #67) and end-to-end manual verification (#29)
+- [ ] User can cancel unmatched intents — code complete (cancel button on /intent/[hash] when state ∈ {PENDING, AUCTIONING}); end-to-end manual verification blocked by #29
 
 Security & Reliability
 - [ ] Unit & integration test coverage >= 90%

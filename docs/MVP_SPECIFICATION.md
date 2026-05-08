@@ -354,11 +354,11 @@ function _lzReceiveConfirm() {
 - Animation on successful settlement
 
 **Definition of Done:**
-- All pages functional
-- Works on MetaMask (desktop + mobile)
-- Responsive design (mobile, tablet, desktop)
-- No console errors
-- UX tested with 5+ users
+- [x] All pages functional — Stage 5 wireframe phase: landing, swap, intent status, history, all five routes build green
+- [x] Works on MetaMask — wagmi v3 multi-wallet picker (MetaMask SDK / Coinbase / WalletConnect / Safe / Injected); user-confirmed connection works against the local Anvil pair
+- [ ] Responsive design (mobile, tablet, desktop) — desktop verified; 375px mobile re-check during brand-styling pass
+- [ ] No console errors — known: CORS errors when frontend → API at :4000 (issue #29)
+- [ ] UX tested with 5+ users — Phase 1 milestone, after brand sign-off + testnet deploy
 
 ### Feature 6: Intent Cancellation
 
