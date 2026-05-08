@@ -28,6 +28,7 @@ function makeInner(): OrderBookRepository {
     listEligibleForAuctionOpen: vi.fn(async () => []),
     listEligibleForAuctionFinalize: vi.fn(async () => []),
     listIntentsByUser: vi.fn(async () => []),
+    listProposalsByIntent: vi.fn(async () => []),
   };
 }
 

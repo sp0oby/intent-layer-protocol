@@ -18,7 +18,10 @@ export type IntentState =
   | 'REFUNDED';
 
 /** Wire-format intent record returned by `GET /api/intents/*`. Numeric
- *  uint256 values are decimal strings (preserves precision through JSON). */
+ *  uint256 values are decimal strings (preserves precision through JSON).
+ *  Per-state tx hashes are optional — the indexer fills them in as the
+ *  corresponding events arrive. The status page renders them as block
+ *  explorer links so users can verify what actually happened. */
 export interface IntentRecord {
   intentHash: string;
   user: string;
@@ -35,6 +38,24 @@ export interface IntentRecord {
   submittedAtBlockTs?: number;
   matchTimestamp?: number;
   auctionDeadline?: number;
+  submitTxHash?: string;
+  matchTxHash?: string;
+  settleTxHash?: string;
+  cancelTxHash?: string;
+  refundTxHash?: string;
+}
+
+/** A solver bid as exposed by `GET /api/intents/:hash/proposals`. */
+export interface ProposalRecord {
+  intentHash: string;
+  solver: string;
+  proposedOutputAmount: string;
+  solverFeeBps: number;
+  winnerAnnounced: boolean;
+  proposalDigest?: string;
+  /** Unix epoch seconds — set on rows the API created via the off-chain
+   *  POST. Indexer-only rows leave it undefined. */
+  createdAt?: number;
 }
 
 /** Mirrors `IIntentSettler.Intent` — what the contract stores on-chain.

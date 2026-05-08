@@ -36,6 +36,7 @@ import {AuctionOrchestrator, type AuctionSubmitter} from '../src/services/auctio
 import {buildChainSubmitters} from '../src/services/chain-submitters.js';
 import {createApp} from '../src/server.js';
 import {attachWsServer} from '../src/services/ws-server.js';
+import {SolverBot} from '../src/bot/solver-bot.js';
 import IntentSettlerAbi from '../src/abis/IntentSettler.json' with {type: 'json'};
 import SolverAuctionAbi from '../src/abis/SolverAuction.json' with {type: 'json'};
 
@@ -110,6 +111,23 @@ async function main(): Promise<void> {
   await fundUsdc(ethStack, recipientAddrs, 10_000_000_000n, 'Eth USDC');
   await fundUsdc(baseStack, recipientAddrs, 10_000_000_000n, 'Base USDC');
   await topUpEth(baseAnvil, recipientAddrs.slice(5), parseEther('1'));
+
+  // ============== solver bot signers ==============
+  // Wallet 5 on each Anvil is the dedicated solver — distinct from
+  // accounts 0..4 (test users) and 0 (deployer/relayer). We use the
+  // raw Wallet (not the NonceManager-wrapped account) because the bot
+  // needs `signingKey` exposed for raw ECDSA signing of the proposal
+  // digest; NonceManager forwards methods but not properties, which
+  // strips signingKey. The bot submits proposals serially so it doesn't
+  // need NonceManager's protection. Anvil prefunds every wallet with
+  // 10k ETH; we top up USDC on both chains so the solver can fill in
+  // either direction.
+  const ethSolverSigner = ethAnvil.wallets[5];
+  const baseSolverSigner = baseAnvil.wallets[5];
+  const solverEthAddr = await ethSolverSigner.getAddress();
+  const solverBaseAddr = await baseSolverSigner.getAddress();
+  await fundUsdc(ethStack, [solverEthAddr], 100_000_000_000n, 'Eth USDC (solver)');
+  await fundUsdc(baseStack, [solverBaseAddr], 100_000_000_000n, 'Base USDC (solver)');
 
   // ============== backend services in the same process ==============
   log('booting backend services…');
@@ -223,6 +241,35 @@ async function main(): Promise<void> {
     {chainId: BASE_CHAIN_ID, eid: BASE_EID, endpoint: baseStack.endpoint}
   );
 
+  // ============== reference solver bot ==============
+  // The bot polls /api/intents/auctioning, signs proposals, POSTs them
+  // to the API, and submits on-chain via SolverAuction.submitProposal.
+  // Markup of 10 bps offers slightly more than the user's minDestAmount
+  // so the proposal always passes the contract's "must clear minOut"
+  // check; a real solver would price against its own inventory model.
+  // Bot starts deferred (post-API listen) below so /api/* is reachable.
+  const solverBot = new SolverBot(
+    {
+      // 127.0.0.1 not 'localhost' — the HTTP server binds to IPv4 only;
+      // Node's fetch on Windows resolves 'localhost' → ::1 first and the
+      // bot ends up trying IPv6 against an IPv4-only socket.
+      apiBaseUrl: `http://127.0.0.1:${API_PORT}`,
+      solverAuctionByChain: {
+        [ETH_CHAIN_ID]: ethStack.auctionAddress,
+        [BASE_CHAIN_ID]: baseStack.auctionAddress,
+      },
+      markupBps: 10,
+      feeBps: 5,
+      pollIntervalMs: 2_500,
+    },
+    {
+      signersByChain: {
+        [ETH_CHAIN_ID]: ethSolverSigner,
+        [BASE_CHAIN_ID]: baseSolverSigner,
+      },
+    }
+  );
+
   // Write the actually-deployed addresses to frontend/.env.local so the
   // frontend's NEXT_PUBLIC_LOCAL_*_ADDRESS overrides pick them up. The
   // CREATE addresses can drift across process restarts (ethers v6 +
@@ -268,6 +315,7 @@ async function main(): Promise<void> {
   for (const idx of indexers) idx.start().catch((err) => log(`indexer error: ${String(err)}`));
   matcher.start().catch((err) => log(`matcher error: ${String(err)}`));
   orchestrator.start().catch((err) => log(`orchestrator error: ${String(err)}`));
+  solverBot.start().catch((err) => log(`solver bot error: ${String(err)}`));
 
   log('---');
   log('Local stack ready.');
@@ -278,7 +326,9 @@ async function main(): Promise<void> {
   log('');
   log('Backend (in-process, no Postgres):');
   log(`  REST + WebSocket on http://localhost:${API_PORT}`);
-  log(`  4 indexers running, matching loop + auction orchestrator + LZ relayer wired`);
+  log(`  4 indexers + matching loop + auction orchestrator + LZ relayer + solver bot`);
+  log(`  Solver: Eth ${solverEthAddr}, Base ${solverBaseAddr}`);
+  log(`  Solver markup: 10 bps over minDest, fee: 5 bps, poll 2.5s`);
   log('');
   log('Deployed addresses (identical on both chains — deterministic deploy):');
   log(`  IntentSettler:     ${ethStack.settlerAddress}`);
@@ -301,6 +351,7 @@ async function main(): Promise<void> {
       for (const idx of indexers) idx.stop();
       matcher.stop();
       orchestrator.stop();
+      solverBot.stop();
       await lzRelayer.stop();
       await new Promise<void>((done) => httpServer.close(() => done()));
       await ethAnvil.stop();

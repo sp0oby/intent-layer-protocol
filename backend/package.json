@@ -15,7 +15,9 @@
     "extract-abis": "node scripts/extract-abis.mjs"
   },
   "dependencies": {
+    "@types/cors": "^2.8.19",
     "@types/ws": "^8.18.1",
+    "cors": "^2.8.6",
     "dotenv": "^16.4.5",
     "ethers": "^6.13.4",
     "express": "^4.21.1",

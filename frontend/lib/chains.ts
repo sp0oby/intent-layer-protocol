@@ -60,3 +60,22 @@ const SHORT_NAMES: Record<number, string> = {
 export function chainShortName(chainId: number): string {
   return SHORT_NAMES[chainId] ?? `Chain ${chainId}`;
 }
+
+/** Block explorer base URLs for each supported chain. Returns undefined
+ *  for local Anvil chains — there's no public explorer for them, so
+ *  the caller should fall back to showing only the truncated hash. */
+const EXPLORER_BASE: Record<number, string> = {
+  [mainnet.id]: 'https://etherscan.io',
+  [base.id]: 'https://basescan.org',
+  [sepolia.id]: 'https://sepolia.etherscan.io',
+  [baseSepolia.id]: 'https://sepolia.basescan.org',
+};
+
+/** Build a tx URL on the chain's block explorer. Returns undefined when
+ *  the chain has no public explorer (local Anvil pair) so the consumer
+ *  can render the hash as plain text rather than a dead link. */
+export function txExplorerUrl(chainId: number, txHash: string): string | undefined {
+  const base = EXPLORER_BASE[chainId];
+  if (!base) return undefined;
+  return `${base}/tx/${txHash}`;
+}

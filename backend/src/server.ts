@@ -1,3 +1,4 @@
+import cors from 'cors';
 import express, {type Request, type Response} from 'express';
 import {healthcheckDb} from './db/pool.js';
 import type {OrderBookRepository} from './db/repository.js';
@@ -34,6 +35,11 @@ interface SerializedIntent {
   submittedAtBlockTs?: number;
   matchTimestamp?: number;
   auctionDeadline?: number;
+  submitTxHash?: string;
+  matchTxHash?: string;
+  settleTxHash?: string;
+  cancelTxHash?: string;
+  refundTxHash?: string;
 }
 
 const serialize = (intent: IntentRecord): SerializedIntent => ({
@@ -52,6 +58,11 @@ const serialize = (intent: IntentRecord): SerializedIntent => ({
   submittedAtBlockTs: intent.submittedAtBlockTs,
   matchTimestamp: intent.matchTimestamp,
   auctionDeadline: intent.auctionDeadline,
+  submitTxHash: intent.submitTxHash,
+  matchTxHash: intent.matchTxHash,
+  settleTxHash: intent.settleTxHash,
+  cancelTxHash: intent.cancelTxHash,
+  refundTxHash: intent.refundTxHash,
 });
 
 interface ProposalRequestBody {
@@ -66,9 +77,29 @@ interface ProposalRequestBody {
 const isString = (v: unknown): v is string => typeof v === 'string';
 const isNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
+/** Origins allowed to call the REST API cross-origin. The frontend dev
+ *  server (Next.js) runs on :3000 — both `localhost` and `127.0.0.1` are
+ *  legitimate paths to it depending on how the user opens the page. The
+ *  CORS_ORIGIN env var lets a deployed environment add or replace the
+ *  allowlist (comma-separated). The WebSocket server doesn't go through
+ *  Express, so it doesn't need this; the `ws` library accepts any Origin
+ *  header on upgrade by default. */
+const DEFAULT_ALLOWED_ORIGINS = ['http://localhost:3000', 'http://127.0.0.1:3000'];
+
+function readAllowedOrigins(): string[] {
+  const fromEnv = process.env.CORS_ORIGIN?.split(',').map((s) => s.trim()).filter(Boolean) ?? [];
+  return [...new Set([...DEFAULT_ALLOWED_ORIGINS, ...fromEnv])];
+}
+
 export function createApp(deps: ApiDependencies) {
   const {repo, config} = deps;
   const app = express();
+  app.use(
+    cors({
+      origin: readAllowedOrigins(),
+      methods: ['GET', 'POST', 'OPTIONS'],
+    })
+  );
   app.use(express.json());
 
   app.get('/health', async (_req: Request, res: Response) => {
@@ -154,6 +185,30 @@ export function createApp(deps: ApiDependencies) {
       return;
     }
     res.json({intent: serialize(intent)});
+  });
+
+  // All proposals for an intent, oldest first. Powers the live "Solver
+  // bids" block on the status page while state === AUCTIONING. Empty
+  // array for unknown / un-bid hashes; non-existent intents are
+  // distinguishable via a 404 from /api/intents/:hash.
+  app.get('/api/intents/:hash/proposals', async (req: Request, res: Response) => {
+    const hash = req.params.hash;
+    if (!hash || !hash.startsWith('0x') || hash.length !== 66) {
+      res.status(400).json({error: 'invalid intent hash'});
+      return;
+    }
+    const proposals = await repo.listProposalsByIntent(hash);
+    res.json({
+      proposals: proposals.map((p) => ({
+        intentHash: p.intentHash,
+        solver: p.solver,
+        proposedOutputAmount: p.proposedOutputAmount,
+        solverFeeBps: p.solverFeeBps,
+        winnerAnnounced: p.winnerAnnounced,
+        proposalDigest: p.proposalDigest,
+        createdAt: p.createdAt,
+      })),
+    });
   });
 
   // Solver proposal ingest. Verifies the signature against the on-chain

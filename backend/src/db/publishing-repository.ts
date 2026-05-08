@@ -102,5 +102,6 @@ export function publishingRepository(inner: OrderBookRepository, bus: IntentEven
     getIntent: inner.getIntent.bind(inner),
     listEligibleForAuctionOpen: inner.listEligibleForAuctionOpen.bind(inner),
     listEligibleForAuctionFinalize: inner.listEligibleForAuctionFinalize.bind(inner),
+    listProposalsByIntent: inner.listProposalsByIntent.bind(inner),
   };
 }

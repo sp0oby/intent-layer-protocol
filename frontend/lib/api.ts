@@ -8,7 +8,7 @@
  * needed.
  */
 
-import type {IntentRecord} from './types';
+import type {IntentRecord, ProposalRecord} from './types';
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
 
@@ -37,6 +37,10 @@ export interface UserIntentsResponse {
   hasMore: boolean;
 }
 
+export interface IntentProposalsResponse {
+  proposals: ProposalRecord[];
+}
+
 export const api = {
   listUnmatched: (chainId?: number): Promise<ListIntentsResponse> =>
     getJson(`/api/intents/unmatched${chainId ? `?chainId=${chainId}` : ''}`),
@@ -46,6 +50,9 @@ export const api = {
 
   getIntent: (intentHash: string): Promise<IntentResponse> =>
     getJson(`/api/intents/${intentHash}`),
+
+  getIntentProposals: (intentHash: string): Promise<IntentProposalsResponse> =>
+    getJson(`/api/intents/${intentHash}/proposals`),
 
   /** History list for one user. limit ≤ 100 (server-enforced). */
   listByUser: (

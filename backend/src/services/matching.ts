@@ -28,7 +28,13 @@ const MATCH_ELIGIBLE: ReadonlySet<IntentState> = new Set<IntentState>(['PENDING'
 
 /** One-to-one with the contract `Intent` struct + indexer bookkeeping fields
  *  populated from event payloads. All numeric on-chain values are stored as
- *  decimal strings to avoid Number precision loss on uint256 amounts. */
+ *  decimal strings to avoid Number precision loss on uint256 amounts.
+ *
+ *  Per-state tx hashes are stamped by the indexer as each on-chain event
+ *  arrives. They power the "view on explorer" chips on the status page —
+ *  without them the user has no way to verify what actually settled.
+ *  Hashes are optional because the corresponding event may not have
+ *  fired yet. */
 export interface IntentRecord {
   intentHash: string;
   user: string;
@@ -45,6 +51,16 @@ export interface IntentRecord {
   submittedAtBlockTs?: number;
   matchTimestamp?: number;
   auctionDeadline?: number;
+  /** Tx that emitted IntentSubmitted on the source chain. */
+  submitTxHash?: string;
+  /** Tx that emitted IntentMatched on the source chain (the executeMatching call). */
+  matchTxHash?: string;
+  /** Tx that emitted IntentSettled on the destination chain. */
+  settleTxHash?: string;
+  /** Tx that emitted IntentCancelled on the source chain. */
+  cancelTxHash?: string;
+  /** Tx that emitted IntentRefunded on the source chain (LZ timeout path). */
+  refundTxHash?: string;
 }
 
 const lower = (addr: string): string => addr.toLowerCase();

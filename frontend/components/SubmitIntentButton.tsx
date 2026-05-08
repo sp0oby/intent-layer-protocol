@@ -21,6 +21,10 @@ interface Props {
   sourceAmount: string;
   minDestAmount: string;
   deadlineMinutes: number;
+  /** Optional refund recipient. Empty / unset means use the connected
+   *  wallet — mirrors the contract convention where address(0) defers
+   *  the refund to msg.sender. */
+  refundTo?: string;
 }
 
 /**
@@ -47,6 +51,7 @@ export function SubmitIntentButton({
   sourceAmount,
   minDestAmount,
   deadlineMinutes,
+  refundTo,
 }: Props) {
   const router = useRouter();
   const {address, isConnected} = useConnection();
@@ -272,7 +277,10 @@ export function SubmitIntentButton({
               destToken: destToken.address,
               minDestAmount: parsed.minDestAmountWei,
               user: address,
-              refundTo: '0x0000000000000000000000000000000000000000',
+              refundTo:
+                refundTo && /^0x[0-9a-fA-F]{40}$/.test(refundTo)
+                  ? (refundTo as `0x${string}`)
+                  : '0x0000000000000000000000000000000000000000',
               deadline,
               nonce,
             },

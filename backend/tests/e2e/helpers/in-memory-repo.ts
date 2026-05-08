@@ -74,12 +74,14 @@ export function createInMemoryRepository(): OrderBookRepository {
         nonce: p.nonce,
         state: 'PENDING',
         submittedAtBlockTs: p.submittedAtBlockTs,
+        submitTxHash: lower(p.submitTxHash),
       });
     },
 
     async markMatched(p: MatchEventPayload) {
-      updateState(p.localHash, 'MATCHED', {matchTimestamp: p.matchTimestamp});
-      updateState(p.remoteHash, 'MATCHED', {matchTimestamp: p.matchTimestamp});
+      const matchTxHash = lower(p.executeMatchTxHash);
+      updateState(p.localHash, 'MATCHED', {matchTimestamp: p.matchTimestamp, matchTxHash});
+      updateState(p.remoteHash, 'MATCHED', {matchTimestamp: p.matchTimestamp, matchTxHash});
       const exists = matches.some(
         (m) =>
           (m.a === lower(p.localHash) && m.b === lower(p.remoteHash)) ||
@@ -91,26 +93,31 @@ export function createInMemoryRepository(): OrderBookRepository {
           b: lower(p.remoteHash),
           sourceChainId: p.sourceChainId,
           destChainId: p.destChainId,
-          tx: lower(p.executeMatchTxHash),
+          tx: matchTxHash,
         });
       }
     },
 
     async markCancelled(p: CancelEventPayload) {
-      updateState(p.intentHash, 'CANCELLED');
+      updateState(p.intentHash, 'CANCELLED', {cancelTxHash: lower(p.cancelTxHash)});
     },
 
     async markSettled(p: SettleEventPayload) {
-      updateState(p.intentHash, 'SETTLED');
+      updateState(p.intentHash, 'SETTLED', {settleTxHash: lower(p.settleTxHash)});
     },
 
     async markRefunded(p: RefundEventPayload) {
       // Mirror pgRepository's CASE-guarded transition: only flip MATCHED ->
       // REFUNDED. The cancel path emits IntentRefunded too but already set
-      // state to CANCELLED via the IntentCancelled handler.
+      // state to CANCELLED via the IntentCancelled handler. We always
+      // record the refund tx hash so the frontend can link to the actual
+      // refund tx whether it came from cancel or LZ-timeout.
       const existing = intents.get(lower(p.intentHash));
+      const refundTxHash = lower(p.refundTxHash);
       if (existing && existing.state === 'MATCHED') {
-        updateState(p.intentHash, 'REFUNDED');
+        updateState(p.intentHash, 'REFUNDED', {refundTxHash});
+      } else if (existing) {
+        updateState(p.intentHash, existing.state, {refundTxHash});
       }
     },
 
@@ -195,6 +202,24 @@ export function createInMemoryRepository(): OrderBookRepository {
         .filter((i) => i.user.toLowerCase() === userAddr.toLowerCase())
         .sort((a, b) => (b.submittedAtBlockTs ?? 0) - (a.submittedAtBlockTs ?? 0));
       return filtered.slice(offset, offset + limit);
+    },
+
+    async listProposalsByIntent(intentHash) {
+      // Filter to this intent and preserve insertion order — matches
+      // pgRepository's ORDER BY created_at ASC. Lifts the stored row
+      // shape to ProposalRecord (exposes winnerAnnounced as the lookup
+      // boolean the frontend renders the "winner" badge from).
+      const lowered = lower(intentHash);
+      return proposals
+        .filter((p) => p.intentHash === lowered)
+        .map((p) => ({
+          intentHash: p.intentHash,
+          solver: p.solver,
+          proposedOutputAmount: p.proposedOutputAmount,
+          solverFeeBps: p.solverFeeBps,
+          winnerAnnounced: p.winnerAnnounced,
+          proposalDigest: p.proposalDigest,
+        }));
     },
   };
 }

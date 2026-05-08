@@ -71,6 +71,20 @@ export interface ProposalEventPayload {
   proposalDigest?: string;
 }
 
+/** Read-side row for the live proposals view on the status page. */
+export interface ProposalRecord {
+  intentHash: string;
+  solver: string;
+  proposedOutputAmount: string;
+  solverFeeBps: number;
+  winnerAnnounced: boolean;
+  /** Set on rows the API ingest path created (off-chain proposal POST). */
+  proposalDigest?: string;
+  /** When the row was first inserted. Used to order proposals oldest-first
+   *  in the UI so the bidding history reads chronologically. */
+  createdAt?: number;
+}
+
 export interface WinnerSelectedPayload {
   intentHash: string;
   solver: string;
@@ -132,6 +146,12 @@ export interface OrderBookRepository {
    *  calls executeWinningProposal on each — the on-chain contract reverts
    *  if the auction has no proposals, so this is safe to call eagerly. */
   listEligibleForAuctionFinalize(sourceChainId: number, nowSec: number): Promise<IntentRecord[]>;
+
+  /** All proposals submitted against `intentHash`, oldest first. Powers
+   *  the live proposals view on the frontend status page so users can
+   *  watch solvers bid in real time. Returns an empty array (not null)
+   *  for unknown hashes. */
+  listProposalsByIntent(intentHash: string): Promise<ProposalRecord[]>;
 }
 
 const toBuffer = (hex: string): Buffer => {
@@ -343,7 +363,8 @@ export function pgRepository(pool: Pool): OrderBookRepository {
       const result: QueryResult<IntentRow> = await pool.query(
         `SELECT intent_hash, user_address, refund_to, source_chain_id, source_token,
                 source_amount, dest_chain_id, dest_token, min_dest_amount, deadline,
-                nonce, state, submitted_at_block_ts, match_timestamp, auction_deadline
+                nonce, state, submitted_at_block_ts, match_timestamp, auction_deadline,
+                submit_tx_hash, cancel_tx_hash, settle_tx_hash
            FROM intents
           WHERE source_chain_id = $1
             AND state IN ('PENDING', 'AUCTIONING')
@@ -357,7 +378,8 @@ export function pgRepository(pool: Pool): OrderBookRepository {
       const result: QueryResult<IntentRow> = await pool.query(
         `SELECT intent_hash, user_address, refund_to, source_chain_id, source_token,
                 source_amount, dest_chain_id, dest_token, min_dest_amount, deadline,
-                nonce, state, submitted_at_block_ts, match_timestamp, auction_deadline
+                nonce, state, submitted_at_block_ts, match_timestamp, auction_deadline,
+                submit_tx_hash, cancel_tx_hash, settle_tx_hash
            FROM intents
           WHERE intent_hash = $1`,
         [toBuffer(lower(intentHash))]
@@ -373,7 +395,8 @@ export function pgRepository(pool: Pool): OrderBookRepository {
       const result: QueryResult<IntentRow> = await pool.query(
         `SELECT intent_hash, user_address, refund_to, source_chain_id, source_token,
                 source_amount, dest_chain_id, dest_token, min_dest_amount, deadline,
-                nonce, state, submitted_at_block_ts, match_timestamp, auction_deadline
+                nonce, state, submitted_at_block_ts, match_timestamp, auction_deadline,
+                submit_tx_hash, cancel_tx_hash, settle_tx_hash
            FROM intents
           WHERE user_address = $1
           ORDER BY submitted_at_block_ts DESC NULLS LAST, created_at DESC
@@ -387,7 +410,8 @@ export function pgRepository(pool: Pool): OrderBookRepository {
       const result: QueryResult<IntentRow> = await pool.query(
         `SELECT intent_hash, user_address, refund_to, source_chain_id, source_token,
                 source_amount, dest_chain_id, dest_token, min_dest_amount, deadline,
-                nonce, state, submitted_at_block_ts, match_timestamp, auction_deadline
+                nonce, state, submitted_at_block_ts, match_timestamp, auction_deadline,
+                submit_tx_hash, cancel_tx_hash, settle_tx_hash
            FROM intents
           WHERE source_chain_id = $1
             AND state = 'PENDING'
@@ -403,7 +427,8 @@ export function pgRepository(pool: Pool): OrderBookRepository {
       const result: QueryResult<IntentRow> = await pool.query(
         `SELECT intent_hash, user_address, refund_to, source_chain_id, source_token,
                 source_amount, dest_chain_id, dest_token, min_dest_amount, deadline,
-                nonce, state, submitted_at_block_ts, match_timestamp, auction_deadline
+                nonce, state, submitted_at_block_ts, match_timestamp, auction_deadline,
+                submit_tx_hash, cancel_tx_hash, settle_tx_hash
            FROM intents
           WHERE source_chain_id = $1
             AND state = 'AUCTIONING'
@@ -413,6 +438,41 @@ export function pgRepository(pool: Pool): OrderBookRepository {
       );
       return result.rows.map(rowToIntentRecord);
     },
+
+    async listProposalsByIntent(intentHash) {
+      const result: QueryResult<ProposalRow> = await pool.query(
+        `SELECT intent_hash, solver_address, proposed_output_amount, solver_fee_bps,
+                winner_announced, proposal_digest,
+                EXTRACT(EPOCH FROM created_at)::bigint AS created_at_epoch
+           FROM solver_proposals
+          WHERE intent_hash = $1
+          ORDER BY created_at ASC NULLS LAST`,
+        [toBuffer(lower(intentHash))]
+      );
+      return result.rows.map(rowToProposalRecord);
+    },
+  };
+}
+
+interface ProposalRow {
+  intent_hash: Buffer;
+  solver_address: Buffer;
+  proposed_output_amount: string;
+  solver_fee_bps: number;
+  winner_announced: boolean;
+  proposal_digest: Buffer | null;
+  created_at_epoch: string | null;
+}
+
+function rowToProposalRecord(row: ProposalRow): ProposalRecord {
+  return {
+    intentHash: bufToHex(row.intent_hash),
+    solver: bufToHex(row.solver_address),
+    proposedOutputAmount: row.proposed_output_amount,
+    solverFeeBps: row.solver_fee_bps,
+    winnerAnnounced: row.winner_announced,
+    proposalDigest: row.proposal_digest ? bufToHex(row.proposal_digest) : undefined,
+    createdAt: row.created_at_epoch !== null ? Number(row.created_at_epoch) : undefined,
   };
 }
 
@@ -432,9 +492,14 @@ interface IntentRow {
   submitted_at_block_ts: string | null;
   match_timestamp: string | null;
   auction_deadline: string | null;
+  submit_tx_hash: Buffer | null;
+  cancel_tx_hash: Buffer | null;
+  settle_tx_hash: Buffer | null;
 }
 
 const bufToHex = (buf: Buffer): string => '0x' + buf.toString('hex');
+const optBufToHex = (buf: Buffer | null): string | undefined =>
+  buf === null ? undefined : bufToHex(buf);
 const numStr = (val: string | null): number | undefined => (val === null ? undefined : Number(val));
 
 function rowToIntentRecord(row: IntentRow): IntentRecord {
@@ -454,6 +519,11 @@ function rowToIntentRecord(row: IntentRow): IntentRecord {
     submittedAtBlockTs: numStr(row.submitted_at_block_ts),
     matchTimestamp: numStr(row.match_timestamp),
     auctionDeadline: numStr(row.auction_deadline),
+    submitTxHash: optBufToHex(row.submit_tx_hash),
+    cancelTxHash: optBufToHex(row.cancel_tx_hash),
+    settleTxHash: optBufToHex(row.settle_tx_hash),
+    // matchTxHash intentionally omitted — lives in the matches table.
+    // The status page reads it via a follow-up query when needed.
   };
 }
 

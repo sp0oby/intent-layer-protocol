@@ -2,32 +2,26 @@
 
 import Link from 'next/link';
 import {useState} from 'react';
+import {ArrowRight} from 'lucide-react';
 import {useConnection} from 'wagmi';
-import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {Button} from '@/components/ui/button';
 import {Skeleton} from '@/components/ui/skeleton';
-import {Badge} from '@/components/ui/badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import {TokenWithChainOverlay} from '@/components/TokenPickerDialog';
 import {useIntentHistory} from '@/hooks/useIntents';
 import {useNowSeconds} from '@/hooks/useNow';
 import {chainShortName} from '@/lib/chains';
 import {formatTokenAmount, relativeTime} from '@/lib/format';
+import {findToken, type TokenSymbol} from '@/lib/tokens';
 import type {IntentRecord, IntentState} from '@/lib/types';
 
 const PAGE_SIZE = 20;
 
 /**
- * Per-user intent history. Wallet-gated: shows a connect prompt when
- * disconnected, a skeleton table while loading, an empty state when
- * the user has no rows, otherwise a paginated table with one row per
- * intent and a "Load more" button when the API reports hasMore.
+ * Per-user intent history. Glass card with the wallet-gated states:
+ * connect prompt → loading skeletons → empty CTA → real rows. Each
+ * row is composed (not tabular) — chain-overlay token icons on each
+ * side, mono amounts, state pill, relative timestamp. Clicking a row
+ * navigates to the status page for that intent.
  */
 export default function HistoryPage() {
   const {address, isConnected} = useConnection();
@@ -39,71 +33,164 @@ export default function HistoryPage() {
   });
 
   return (
-    <section className="mx-auto max-w-3xl px-6 py-12">
-      <Card className="border-border/60">
-        <CardHeader>
-          <CardTitle className="text-2xl">History</CardTitle>
-          <CardDescription>
-            Every intent you&rsquo;ve submitted, newest first.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {!isConnected ? (
-            <ConnectPrompt />
-          ) : isLoading ? (
-            <LoadingRows />
-          ) : error ? (
-            <p className="text-sm text-destructive">{(error as Error).message}</p>
-          ) : !data || data.intents.length === 0 ? (
-            page === 0 ? (
-              <EmptyState />
-            ) : (
-              <p className="text-sm text-muted-foreground">No more intents on this page.</p>
-            )
-          ) : (
-            <HistoryTable intents={data.intents} />
-          )}
+    <section className="relative mx-auto max-w-3xl px-6 py-12 sm:py-16">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -inset-16 -z-10 rounded-[40%] bg-[radial-gradient(ellipse_55%_50%_at_50%_50%,color-mix(in_oklch,var(--color-primary)_18%,transparent),transparent_70%)] blur-2xl"
+      />
 
-          {data && (data.hasMore || page > 0) ? (
-            <div className="mt-4 flex items-center justify-between gap-3 text-sm">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page === 0}
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-              >
-                Previous
-              </Button>
-              <span className="text-muted-foreground">
-                Page {page + 1}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!data.hasMore}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Load more
-              </Button>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
+      <header className="mb-6">
+        <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+          History
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Every intent submitted from the connected wallet, newest first.
+        </p>
+      </header>
+
+      <div className="overflow-hidden rounded-3xl bg-card/70 shadow-2xl shadow-primary/10 ring-1 ring-foreground/10 backdrop-blur-2xl">
+        {!isConnected ? (
+          <ConnectPrompt />
+        ) : isLoading ? (
+          <LoadingRows />
+        ) : error ? (
+          <Notice tone="error">{(error as Error).message}</Notice>
+        ) : !data || data.intents.length === 0 ? (
+          page === 0 ? (
+            <EmptyState />
+          ) : (
+            <Notice tone="muted">No more intents on this page.</Notice>
+          )
+        ) : (
+          <HistoryRows intents={data.intents} />
+        )}
+
+        {data && (data.hasMore || page > 0) ? (
+          <Pagination
+            page={page}
+            hasMore={data.hasMore}
+            onPrev={() => setPage((p) => Math.max(0, p - 1))}
+            onNext={() => setPage((p) => p + 1)}
+          />
+        ) : null}
+      </div>
     </section>
+  );
+}
+
+function HistoryRows({intents}: {intents: IntentRecord[]}) {
+  const nowSec = useNowSeconds(60_000);
+  return (
+    <ul className="divide-y divide-foreground/5">
+      {intents.map((intent) => (
+        <HistoryRow key={intent.intentHash} intent={intent} nowSec={nowSec} />
+      ))}
+    </ul>
+  );
+}
+
+function HistoryRow({intent, nowSec}: {intent: IntentRecord; nowSec: number}) {
+  const sourceSymbol = inferSymbol(intent.sourceToken, intent.sourceChainId);
+  const destSymbol = inferSymbol(intent.destToken, intent.destChainId);
+  const sourceLabel = formatTokenAmount(intent.sourceAmount, intent.sourceToken, intent.sourceChainId);
+  const destLabel = formatTokenAmount(intent.minDestAmount, intent.destToken, intent.destChainId);
+  const submittedAt = intent.submittedAtBlockTs;
+
+  const [sourceAmount, sourceUnit] = splitAmountLabel(sourceLabel);
+  const [destAmount, destUnit] = splitAmountLabel(destLabel);
+
+  return (
+    <li>
+      <Link
+        href={`/intent/${intent.intentHash}`}
+        className="grid grid-cols-12 items-center gap-4 px-5 py-4 transition-colors hover:bg-foreground/[0.02] sm:px-6 sm:py-5"
+      >
+        <div className="col-span-12 flex items-center gap-3 sm:col-span-5">
+          {sourceSymbol ? (
+            <TokenWithChainOverlay
+              symbol={sourceSymbol}
+              chainId={intent.sourceChainId}
+              size={32}
+            />
+          ) : (
+            <span className="size-8 rounded-full bg-muted-foreground/30" />
+          )}
+          <ArrowRight className="size-3.5 text-muted-foreground/60" aria-hidden="true" />
+          {destSymbol ? (
+            <TokenWithChainOverlay symbol={destSymbol} chainId={intent.destChainId} size={32} />
+          ) : (
+            <span className="size-8 rounded-full bg-muted-foreground/30" />
+          )}
+          <div className="ml-1 hidden flex-col leading-tight sm:flex">
+            <span className="text-sm font-semibold text-foreground">
+              {sourceSymbol ? `${sourceSymbol} · ` : ''}
+              {chainShortName(intent.sourceChainId)}
+              <span className="text-muted-foreground"> → </span>
+              {destSymbol ? `${destSymbol} · ` : ''}
+              {chainShortName(intent.destChainId)}
+            </span>
+            <span className="font-mono text-xs text-muted-foreground">
+              {intent.intentHash.slice(0, 6)}…{intent.intentHash.slice(-4)}
+            </span>
+          </div>
+        </div>
+
+        <div className="col-span-7 hidden text-sm sm:col-span-4 sm:block">
+          <div className="font-mono tabular-nums text-foreground">
+            {sourceAmount} <span className="text-muted-foreground">{sourceUnit}</span>
+          </div>
+          <div className="mt-0.5 font-mono text-xs tabular-nums text-muted-foreground">
+            ≥ {destAmount} {destUnit}
+          </div>
+        </div>
+
+        <div className="col-span-8 sm:col-span-2">
+          <StatePill state={intent.state} />
+        </div>
+
+        <div className="col-span-4 text-right text-xs text-muted-foreground sm:col-span-1">
+          {submittedAt ? relativeTime(nowSec - submittedAt) : '—'}
+        </div>
+      </Link>
+    </li>
+  );
+}
+
+function StatePill({state}: {state: IntentState}) {
+  const tone = stateTone(state);
+  const label = stateLabel(state);
+  const cls =
+    tone === 'active'
+      ? 'bg-primary/10 text-primary ring-primary/40'
+      : tone === 'success'
+        ? 'bg-foreground/[0.06] text-foreground ring-foreground/15'
+        : 'bg-foreground/[0.04] text-muted-foreground ring-foreground/10';
+  return (
+    <span
+      className={
+        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] ring-1 ' +
+        cls
+      }
+    >
+      {tone === 'active' ? (
+        <span className="size-1.5 rounded-full bg-primary shadow-[0_0_8px_var(--color-primary)]" />
+      ) : null}
+      {label}
+    </span>
   );
 }
 
 function ConnectPrompt() {
   return (
-    <p className="text-sm text-muted-foreground">
+    <Notice tone="muted">
       Connect a wallet to see the intents you&rsquo;ve submitted.
-    </p>
+    </Notice>
   );
 }
 
 function EmptyState() {
   return (
-    <div className="flex flex-col items-start gap-3 py-2">
+    <div className="flex flex-col items-start gap-3 px-6 py-10">
       <p className="text-sm text-muted-foreground">
         No intents yet from this wallet.
       </p>
@@ -116,87 +203,86 @@ function EmptyState() {
 
 function LoadingRows() {
   return (
-    <div className="space-y-2">
+    <div className="divide-y divide-foreground/5">
       {[0, 1, 2, 3].map((i) => (
-        <Skeleton key={i} className="h-10 w-full" />
+        <div key={i} className="px-6 py-5">
+          <Skeleton className="h-10 w-full" />
+        </div>
       ))}
     </div>
   );
 }
 
-function HistoryTable({intents}: {intents: IntentRecord[]}) {
-  // 60s tick is plenty for relative-time labels — we don't need to
-  // re-render every second on a list view.
-  const nowSec = useNowSeconds(60_000);
+function Notice({children, tone}: {children: React.ReactNode; tone: 'muted' | 'error'}) {
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Hash</TableHead>
-          <TableHead>Route</TableHead>
-          <TableHead>Sent</TableHead>
-          <TableHead>State</TableHead>
-          <TableHead>When</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {intents.map((intent) => (
-          <Row key={intent.intentHash} intent={intent} nowSec={nowSec} />
-        ))}
-      </TableBody>
-    </Table>
+    <p className={'px-6 py-10 text-sm ' + (tone === 'error' ? 'text-destructive' : 'text-muted-foreground')}>
+      {children}
+    </p>
   );
 }
 
-function Row({intent, nowSec}: {intent: IntentRecord; nowSec: number}) {
-  const sourceLabel = formatTokenAmount(
-    intent.sourceAmount,
-    intent.sourceToken,
-    intent.sourceChainId
-  );
-  const submittedAt = intent.submittedAtBlockTs;
-
+function Pagination({
+  page,
+  hasMore,
+  onPrev,
+  onNext,
+}: {
+  page: number;
+  hasMore: boolean;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
   return (
-    <TableRow>
-      <TableCell className="font-mono text-xs">
-        <Link
-          href={`/intent/${intent.intentHash}`}
-          className="underline-offset-2 hover:underline"
-        >
-          {intent.intentHash.slice(0, 6)}…{intent.intentHash.slice(-4)}
-        </Link>
-      </TableCell>
-      <TableCell className="text-xs">
-        {chainShortName(intent.sourceChainId)} → {chainShortName(intent.destChainId)}
-      </TableCell>
-      <TableCell className="text-xs">{sourceLabel}</TableCell>
-      <TableCell>
-        <StateBadge state={intent.state} />
-      </TableCell>
-      <TableCell className="text-xs text-muted-foreground">
-        {submittedAt ? relativeTime(nowSec - submittedAt) : '—'}
-      </TableCell>
-    </TableRow>
+    <div className="flex items-center justify-between gap-3 border-t border-foreground/5 px-6 py-4 text-sm">
+      <Button variant="outline" size="sm" disabled={page === 0} onClick={onPrev}>
+        Previous
+      </Button>
+      <span className="text-xs text-muted-foreground">Page {page + 1}</span>
+      <Button variant="outline" size="sm" disabled={!hasMore} onClick={onNext}>
+        Load more
+      </Button>
+    </div>
   );
 }
 
-function StateBadge({state}: {state: IntentState}) {
-  // Wireframe rule: no accent colours. Differentiate states only by
-  // the badge variant shadcn ships (default = filled, outline, secondary,
-  // destructive). Map terminal-success to default, terminal-failure to
-  // destructive, in-flight to outline, transient to secondary.
-  const variant: 'default' | 'destructive' | 'outline' | 'secondary' =
-    state === 'SETTLED'
-      ? 'default'
-      : state === 'CANCELLED' || state === 'REFUNDED'
-      ? 'destructive'
-      : state === 'AUCTIONING'
-      ? 'secondary'
-      : 'outline';
-  return (
-    <Badge variant={variant} className="text-[10px] uppercase tracking-wider">
-      {state.toLowerCase()}
-    </Badge>
-  );
+function inferSymbol(addr: string, chainId: number): TokenSymbol | undefined {
+  const lower = addr.toLowerCase();
+  for (const symbol of ['ETH', 'USDC', 'USDT'] as const) {
+    const token = findToken(chainId, symbol);
+    if (token && token.address.toLowerCase() === lower) return symbol;
+  }
+  return undefined;
 }
 
+function splitAmountLabel(label: string): [string, string] {
+  const idx = label.indexOf(' ');
+  if (idx === -1) return [label, ''];
+  return [label.slice(0, idx), label.slice(idx + 1)];
+}
+
+function stateTone(state: IntentState): 'muted' | 'active' | 'success' {
+  if (state === 'PENDING' || state === 'AUCTIONING' || state === 'MATCHED' || state === 'LOCKED') {
+    return 'active';
+  }
+  if (state === 'SETTLED') return 'success';
+  return 'muted';
+}
+
+function stateLabel(state: IntentState): string {
+  switch (state) {
+    case 'PENDING':
+      return 'Pending';
+    case 'AUCTIONING':
+      return 'Auction';
+    case 'MATCHED':
+      return 'Matched';
+    case 'LOCKED':
+      return 'Settling';
+    case 'SETTLED':
+      return 'Settled';
+    case 'CANCELLED':
+      return 'Cancelled';
+    case 'REFUNDED':
+      return 'Refunded';
+  }
+}

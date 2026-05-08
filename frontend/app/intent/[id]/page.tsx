@@ -1,3 +1,4 @@
+import type {Metadata} from 'next';
 import Link from 'next/link';
 import {IntentStatusClient} from './status-client';
 
@@ -6,15 +7,25 @@ import {IntentStatusClient} from './status-client';
 // us `id === undefined` at runtime.
 type PageProps = {params: Promise<{id: string}>};
 
+export async function generateMetadata({params}: PageProps): Promise<Metadata> {
+  const {id} = await params;
+  const isHash = id.startsWith('0x') && id.length === 66;
+  const short = isHash ? `${id.slice(0, 6)}…${id.slice(-4)}` : id;
+  return {
+    title: `Intent ${short}`,
+    description: `Live status for intent ${short} on the Intent Layer Protocol.`,
+  };
+}
+
 export default async function IntentStatusPage({params}: PageProps) {
   const {id} = await params;
   return (
-    <section className="mx-auto max-w-xl px-6 py-12">
+    <section className="mx-auto max-w-2xl px-6 py-12 sm:py-16">
       <Link
-        href="/swap"
-        className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+        href="/history"
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
-        ← Back to swap
+        ← All intents
       </Link>
       <IntentStatusClient id={id} />
     </section>

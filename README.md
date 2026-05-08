@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Solidity](https://img.shields.io/badge/Solidity-0.8.26-363636?logo=solidity&logoColor=white)](contracts/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](backend/)
-[![Next.js](https://img.shields.io/badge/Next.js-14-000000?logo=next.js&logoColor=white)](frontend/)
+[![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=next.js&logoColor=white)](frontend/)
 
 **Cross-chain intent settlement for Ethereum ↔ Base** — users express a single high-level swap goal; the system fulfills it via **peer-to-peer intent matching** when possible, or a **competitive solver auction** when not.
 
@@ -59,7 +59,7 @@ This is why we put the P2P path *first* and the bonded solver auction *second*. 
 | **Specification** | Protocol design and planning docs live under [`docs/`](#documentation) |
 | **Smart contracts** | **Stages 1 + 2 + 3 complete + follow-up security pass** — `IntentSettler` is a full LayerZero V2 OApp: EIP-712 hashing, native-ETH + ERC-20 (incl. USDT-style) escrow, `cancelIntent`, `executeMatching` with `_lzSend`, `_lzReceive` dispatching `EXECUTE_MATCH` / `CONFIRM`, `refundIfLzTimeout` (6 hr recovery), `openAuction`, `setSolverAuction`. `SolverAuction` integrated. Match validation (token + chain + both-sides amount minimums) is enforced **on the destination chain using only trusted data** — the matcher cannot bypass `minDestAmount` or `destToken`. CONFIRM leg has the same source-EID guard as EXECUTE_MATCH. User ETH escrow is segregated from operator pre-fund and can never be debited for LayerZero fees. **100/100 tests (94 unit/fuzz/integration + 6 stateful invariants × 256 runs × ~500 calls ≈ 768k random sequences). Slither: 0 medium+ findings across 41 contracts.** |
 | **Backend** | **Stage 4 feature-complete** — multi-chain event indexer with resumable cursor, DB-backed matching loop with relayer dispatch, auction orchestrator (open + finalize), REST + WebSocket API, ECDSA proposal verification, reference solver bot, runtime composition. **101/101 vitest unit + 4/4 E2E** (E2E spawns two real Anvil instances and drives a full P2P round-trip with cross-chain LayerZero relay). `tsc --noEmit` clean. |
-| **Frontend** | **Stage 5 wireframe phase complete** — Next 16 + React 19 + Tailwind v4 + shadcn/ui + Framer Motion + wagmi v3 + viem + TanStack Query + Zustand. Multi-wallet picker (MetaMask SDK / Coinbase / WalletConnect / Safe / Injected fallback), real `submitIntent` swap form with chained ERC-20 approval, animated state-machine status page with cancel + refund actions, paginated history page, AppShell with network-mismatch banner. **40/40 vitest unit pass, lint + build green.** End-to-end manual flow against the local-Anvil harness has a known gap (issue #29 — suspected CORS); brand-styling pass is next. |
+| **Frontend** | **Stage 5 feature-complete** — Next 16 + React 19 + Tailwind v4 + shadcn/ui + Framer Motion + wagmi v3 + viem + TanStack Query + Zustand. Multi-wallet picker, across-style swap form with combined token+chain picker dialog, indicative-rate auto-fill + slippage selector, real `submitIntent` flow with chained ERC-20 approval, settings popover (deadline + refund-to override), state-driven status page with route preview / live solver-bid feed / per-state tx hash explorer chips, paginated history with chain-overlay token icons, glass-card design system across landing / swap / status / history. **40/40 vitest unit pass, lint + build green, mobile-responsive at 375px.** End-to-end manual flow lands cleanly on the local Anvil pair via `npm run local-stack` (see Quickstart). |
 | **CI** | GitHub Actions: Foundry + backend `tsc`/tests + frontend build ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) |
 
 The on-chain code is **internally audited and locally tested** but has not yet been through an external audit, testnet, or mainnet deployment. Treat it accordingly.
@@ -135,6 +135,27 @@ cd backend && npm run dev          # API → http://localhost:4000
 cd frontend && npm run dev         # UI  → http://localhost:3000
 ```
 
+### One-command local stack (recommended for frontend testing)
+
+The `local-stack` script spawns two Anvil instances, deploys the contract
+stack on each, and boots the entire backend (4 indexers + matching loop
++ auction orchestrator + LayerZero relayer + solver bot + REST/WS API)
+in a single process. No Postgres needed (in-memory repo), no `.env`
+tweaks — it writes the freshly-deployed addresses to
+`frontend/.env.local` for you.
+
+```bash
+cd backend && npm run local-stack
+# in another terminal:
+cd frontend && npm run dev
+```
+
+Open `http://localhost:3000`, connect MetaMask to **Anvil Eth (chain 31337,
+RPC `http://127.0.0.1:38545`)** or **Anvil Base (chain 31338, RPC
+`http://127.0.0.1:38546`)**, and submit a swap. The bundled solver bot
+will bid on the auction so you'll see the full
+`PENDING → AUCTIONING → MATCHED → SETTLED` flow end-to-end.
+
 To refresh `forge-std` from upstream instead of the vendored copy:
 
 ```bash
@@ -194,7 +215,7 @@ Yes, periodically — especially before releases. Pinned versions may have known
 **Stage 4 is feature-complete locally.** Multi-chain event indexer with resumable cursor, DB-backed matching loop with relayer dispatch, auction orchestrator (open + finalize), REST + WebSocket API with on-chain `proposalDigest` ECDSA verification, reference solver bot, and runtime composition all exist with **101/101 vitest unit + 4/4 E2E** (the E2E spawns two real Anvil instances and drives a P2P swap end-to-end through a real LayerZero relay between two `MockLzEndpoint` instances). Production hardening (monitoring, alerting, multi-instance HA) is Stage 9.
 
 **Is the frontend "done"?**  
-No — the frontend is the next milestone (Stage 5). Today it's a Next.js skeleton with wallet connect (wagmi) and pages wired to a mock API. Real contract calls, ERC-20 approval flow, real-time intent status via WebSocket, and the transaction-history page land in Stage 5.
+**Stage 5 is feature-complete.** Multi-wallet picker, across-style combined token+chain picker dialog, indicative-rate UX with slippage selector, real `submitIntent` flow with chained ERC-20 approval, status page with state-driven route preview + live solver-bid feed + per-state tx hash explorer chips, paginated history with chain-overlay token icons, glass-card design system across landing / swap / status / history, mobile-responsive at 375px. Settings popover for deadline + refund-to override. Lint + build + 40/40 vitest unit pass green. The end-to-end manual flow runs cleanly against the bundled local-stack (`cd backend && npm run local-stack`). Production hardening (Sepolia testnet deploy, real price feed in place of `lib/rates.ts`) is Stage 8.
 
 **Who maintains this?**  
 Project founder: **[@sp0oby](https://github.com/sp0oby)**. Contributors welcome per [CONTRIBUTING.md](CONTRIBUTING.md).

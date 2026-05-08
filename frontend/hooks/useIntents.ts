@@ -12,7 +12,7 @@
 
 import {useQuery} from '@tanstack/react-query';
 import {api} from '@/lib/api';
-import type {IntentRecord} from '@/lib/types';
+import type {IntentRecord, ProposalRecord} from '@/lib/types';
 
 /** All match-eligible intents (PENDING or AUCTIONING, not expired). */
 export function useUnmatchedIntents(chainId?: number) {
@@ -45,6 +45,20 @@ export function useIntent(intentHash: string | undefined) {
     queryFn: () => api.getIntent(intentHash as string),
     select: (data): IntentRecord => data.intent,
     refetchInterval: 5_000,
+  });
+}
+
+/** Live proposals for an intent. Status page uses this while the
+ *  intent is in AUCTIONING so the user can watch solvers bid. Empty
+ *  array is a valid response (unbid intent). */
+export function useIntentProposals(intentHash: string | undefined) {
+  return useQuery({
+    queryKey: ['intent', intentHash, 'proposals'],
+    enabled: typeof intentHash === 'string' && intentHash.startsWith('0x') && intentHash.length === 66,
+    queryFn: () => api.getIntentProposals(intentHash as string),
+    select: (data): ProposalRecord[] => data.proposals,
+    refetchInterval: 3_000,
+    staleTime: 1_500,
   });
 }
 

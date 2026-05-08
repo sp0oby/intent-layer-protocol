@@ -2,74 +2,61 @@
 
 import {ArrowDown} from 'lucide-react';
 import {useMemo, useState} from 'react';
-import {useChainId, useConnection} from 'wagmi';
-import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
+import {useChainId, useConnection, useSwitchChain} from 'wagmi';
 import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {SubmitIntentButton} from '@/components/SubmitIntentButton';
-import {chainShortName, isSupportedChain} from '@/lib/chains';
+import {SwapSettings, type SwapSettingsValue} from '@/components/SwapSettings';
+import {TokenChainChip} from '@/components/TokenChainChip';
+import {TokenPickerDialog} from '@/components/TokenPickerDialog';
+import {isSupportedChain} from '@/lib/chains';
 import {sanitizeDecimal} from '@/lib/decimal-input';
-import {findToken, partnerChainOf, tokensForChain, type TokenSymbol} from '@/lib/tokens';
+import {
+  applySlippage,
+  DEFAULT_SLIPPAGE_BPS,
+  expectedDestAmount,
+  formatExpected,
+  indicativeRate,
+  SLIPPAGE_OPTIONS_BPS,
+} from '@/lib/rates';
+import {findToken, partnerChainOf, type TokenSymbol} from '@/lib/tokens';
 
-/** Default intent deadline. The matcher's poll cadence + LZ delivery
- *  budget fits comfortably under 30 min; advanced settings will let
- *  the user shorten or extend this. */
-const DEFAULT_DEADLINE_MINUTES = 30;
+const DEFAULT_SETTINGS: SwapSettingsValue = {
+  deadlineMinutes: 30,
+  refundTo: '',
+};
 
 /**
- * Cross-chain swap form. Source chain is derived from the wallet's
- * connected chain — if the user wants to swap *from* the other side,
- * they switch network (the AppShell's NetworkBanner makes this one
- * click). Destination chain auto-derives from the partner mapping.
+ * Cross-chain swap form. Single user-typed amount on the From side; the
+ * To side auto-fills with the expected destination amount derived from
+ * an indicative rate map (`lib/rates.ts`). The user picks a slippage
+ * tolerance via a small pill row and we submit
+ *   `minDestAmount = expected × (1 - slippage)`
+ * on-chain — that's the worst-case price the user agrees to.
  *
- * Wireframe phase: pure b&w, no live USD shadow yet (needs price feed).
- * Validation messages live in the submit button label so there's a
- * single signal for "what's wrong."
+ * The picker, chain switching, flip behaviour all stay the same. The
+ * route preview no longer lives on this page (it surfaces on the
+ * status page once the intent is submitted).
+ *
+ * The indicative rate is dev-only — replace `lib/rates.ts` with a real
+ * feed before mainnet.
  */
 export function SwapForm() {
   const {isConnected} = useConnection();
   const chainId = useChainId();
+  const {switchChain, isPending: switchPending} = useSwitchChain();
 
-  // Source chain follows the connected wallet. When the user is on an
-  // unsupported chain, AppShell's NetworkBanner above already shows the
-  // switch UX — we just disable inputs.
   const sourceChainId = isConnected && isSupportedChain(chainId) ? chainId : undefined;
   const destChainId = useMemo(() => partnerChainOf(sourceChainId), [sourceChainId]);
 
-  const sourceTokens = useMemo(() => tokensForChain(sourceChainId), [sourceChainId]);
-  const destTokens = useMemo(() => tokensForChain(destChainId), [destChainId]);
-
-  // User-picked symbols. Defaults to ETH/USDC; either side can be
-  // changed via the Select. The *effective* symbol below derives from
-  // these so a chain switch that drops a token (e.g. USDT not on Base)
-  // falls through automatically without firing a state update — keeps
-  // React 19's set-state-in-effect rule happy.
-  const [pickedSourceSymbol, setSourceSymbol] = useState<TokenSymbol>('ETH');
-  const [pickedDestSymbol, setDestSymbol] = useState<TokenSymbol>('USDC');
+  const [sourceSymbol, setSourceSymbol] = useState<TokenSymbol>('ETH');
+  const [destSymbol, setDestSymbol] = useState<TokenSymbol>('USDC');
   const [sourceAmount, setSourceAmount] = useState('');
-  const [minDestAmount, setMinDestAmount] = useState('');
+  const [slippageBps, setSlippageBps] = useState<number>(DEFAULT_SLIPPAGE_BPS);
+  const [settings, setSettings] = useState<SwapSettingsValue>(DEFAULT_SETTINGS);
 
-  const sourceSymbol = useMemo(
-    () =>
-      sourceTokens.find((t) => t.symbol === pickedSourceSymbol)?.symbol ??
-      sourceTokens[0]?.symbol ??
-      pickedSourceSymbol,
-    [sourceTokens, pickedSourceSymbol]
-  );
-  const destSymbol = useMemo(
-    () =>
-      destTokens.find((t) => t.symbol === pickedDestSymbol)?.symbol ??
-      destTokens[0]?.symbol ??
-      pickedDestSymbol,
-    [destTokens, pickedDestSymbol]
-  );
+  const [fromPickerOpen, setFromPickerOpen] = useState(false);
+  const [toPickerOpen, setToPickerOpen] = useState(false);
 
   const sourceToken = useMemo(
     () => findToken(sourceChainId, sourceSymbol),
@@ -77,121 +64,325 @@ export function SwapForm() {
   );
   const destToken = useMemo(() => findToken(destChainId, destSymbol), [destChainId, destSymbol]);
 
-  return (
-    <Card className="border-border/40 shadow-2xl shadow-primary/5">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-2xl font-semibold tracking-tight">Swap</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-1.5">
-        <Side
-          legend="You send"
-          chainId={sourceChainId}
-          tokens={sourceTokens}
-          symbol={sourceSymbol}
-          onSymbolChange={setSourceSymbol}
-          amount={sourceAmount}
-          onAmountChange={setSourceAmount}
-          amountPlaceholder="0.0"
-          amountLabel="You send"
-        />
+  // Auto-fill: expected destination at the indicative rate, then floor
+  // by the user's slippage tolerance for the on-chain min.
+  const expected = useMemo(
+    () => expectedDestAmount(sourceAmount, sourceSymbol, destSymbol),
+    [sourceAmount, sourceSymbol, destSymbol]
+  );
+  const minDest = useMemo(
+    () => (expected === null ? null : applySlippage(expected, slippageBps)),
+    [expected, slippageBps]
+  );
 
-        <div className="relative -my-3 flex items-center justify-center">
-          <span className="flex size-9 items-center justify-center rounded-xl border border-border bg-card/80 text-muted-foreground shadow-sm backdrop-blur-md transition-colors hover:border-primary/40 hover:text-foreground">
-            <ArrowDown className="size-4" aria-hidden="true" />
-          </span>
+  // Decimal-string form the SubmitIntentButton hands to viem's parseUnits.
+  // Round to the destination token's decimals so we never produce a
+  // string parseUnits can't accept (e.g. 19 fractional digits on USDC).
+  const minDestAmountStr = useMemo(() => {
+    if (minDest === null) return '';
+    const decimals = destToken?.decimals ?? 18;
+    return minDest.toFixed(decimals);
+  }, [minDest, destToken]);
+
+  const rate = useMemo(() => indicativeRate(sourceSymbol, destSymbol), [sourceSymbol, destSymbol]);
+
+  const flipChain = () => {
+    if (!destChainId || switchPending) return;
+    switchChain({chainId: destChainId});
+  };
+
+  const handleFromPick = (pickedChainId: number, pickedSymbol: TokenSymbol) => {
+    setSourceSymbol(pickedSymbol);
+    if (!isSupportedChain(pickedChainId)) return;
+    if (pickedChainId !== sourceChainId) {
+      switchChain({chainId: pickedChainId});
+    }
+  };
+
+  const handleToPick = (pickedChainId: number, pickedSymbol: TokenSymbol) => {
+    setDestSymbol(pickedSymbol);
+    const partner = partnerChainOf(pickedChainId);
+    if (!partner) return;
+    if (partner !== sourceChainId) {
+      switchChain({chainId: partner});
+    }
+  };
+
+  return (
+    <div className="relative">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -inset-16 -z-10 rounded-[40%] bg-[radial-gradient(ellipse_55%_50%_at_50%_50%,color-mix(in_oklch,var(--color-primary)_18%,transparent),transparent_70%)] blur-2xl"
+      />
+
+      <div className="overflow-hidden rounded-3xl bg-card/70 p-6 shadow-2xl shadow-primary/10 ring-1 ring-foreground/10 backdrop-blur-2xl sm:p-7">
+        <div className="mb-3 flex items-center justify-end">
+          <SwapSettings value={settings} onChange={setSettings} />
+        </div>
+        <div className="space-y-2">
+          <FromSide
+            chainId={sourceChainId}
+            symbol={sourceSymbol}
+            amount={sourceAmount}
+            onAmountChange={setSourceAmount}
+            onChipClick={() => setFromPickerOpen(true)}
+            placeholderChainName="Connect wallet"
+            chainSwitchPending={switchPending}
+          />
+
+          <FlipDivider onFlip={flipChain} disabled={!destChainId || switchPending} />
+
+          <ToSide
+            chainId={destChainId}
+            symbol={destSymbol}
+            expected={expected}
+            onChipClick={() => setToPickerOpen(true)}
+            placeholderChainName="—"
+            chainSwitchPending={switchPending}
+          />
         </div>
 
-        <Side
-          legend="You receive (min)"
-          chainId={destChainId}
-          tokens={destTokens}
-          symbol={destSymbol}
-          onSymbolChange={setDestSymbol}
-          amount={minDestAmount}
-          onAmountChange={setMinDestAmount}
-          amountPlaceholder="0.0"
-          amountLabel="You receive (min)"
+        <SlippageRow
+          slippageBps={slippageBps}
+          onChange={setSlippageBps}
+          minDest={minDest}
+          destSymbol={destSymbol}
+          rate={rate}
+          srcSymbol={sourceSymbol}
         />
 
-        <div className="pt-4">
+        <div className="mt-5">
           <SubmitIntentButton
             sourceChainId={sourceChainId}
             destChainId={destChainId}
             sourceToken={sourceToken}
             destToken={destToken}
             sourceAmount={sourceAmount}
-            minDestAmount={minDestAmount}
-            deadlineMinutes={DEFAULT_DEADLINE_MINUTES}
+            minDestAmount={minDestAmountStr}
+            deadlineMinutes={settings.deadlineMinutes}
+            refundTo={settings.refundTo}
           />
         </div>
-      </CardContent>
-    </Card>
+      </div>
+
+      <TokenPickerDialog
+        open={fromPickerOpen}
+        onOpenChange={setFromPickerOpen}
+        title="Select origin token"
+        currentChainId={sourceChainId}
+        currentSymbol={sourceSymbol}
+        onPick={handleFromPick}
+      />
+      <TokenPickerDialog
+        open={toPickerOpen}
+        onOpenChange={setToPickerOpen}
+        title="Select destination token"
+        currentChainId={destChainId}
+        currentSymbol={destSymbol}
+        onPick={handleToPick}
+      />
+    </div>
   );
 }
 
-function Side({
-  legend,
+function FromSide({
   chainId,
-  tokens,
   symbol,
-  onSymbolChange,
   amount,
   onAmountChange,
-  amountLabel,
-  amountPlaceholder,
+  onChipClick,
+  placeholderChainName,
+  chainSwitchPending,
 }: {
-  legend: string;
   chainId: number | undefined;
-  tokens: ReturnType<typeof tokensForChain>;
   symbol: TokenSymbol;
-  onSymbolChange: (next: TokenSymbol) => void;
   amount: string;
   onAmountChange: (next: string) => void;
-  amountLabel: string;
-  amountPlaceholder: string;
+  onChipClick: () => void;
+  placeholderChainName: string;
+  chainSwitchPending: boolean;
 }) {
-  const fieldId = `${legend.toLowerCase().replace(/\s+/g, '-')}-amount`;
+  const fieldId = 'from-amount';
   return (
-    <div className="group/side rounded-2xl border border-border/60 bg-background/40 p-4 transition-colors focus-within:border-primary/40 hover:border-border">
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-          {legend}
-        </span>
-        <span className="text-xs font-medium text-muted-foreground">
-          {chainId ? chainShortName(chainId) : '— connect wallet —'}
-        </span>
+    <div className="rounded-2xl bg-background/40 p-5 ring-1 ring-foreground/5 transition-colors focus-within:ring-primary/30 hover:bg-background/50">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/85">
+        From
       </div>
-      <div className="mt-3 flex items-center gap-3">
+      <div className="mt-3 flex items-center justify-between gap-4">
         <Input
           id={fieldId}
           inputMode="decimal"
           value={amount}
           onChange={(e) => onAmountChange(sanitizeDecimal(e.target.value))}
-          placeholder={amountPlaceholder}
+          placeholder="0.0"
           disabled={!chainId}
-          className="h-auto border-0 bg-transparent px-0 font-mono text-3xl font-semibold tabular-nums shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/40 dark:bg-transparent"
+          // The shared Input primitive bakes in `md:text-sm` — without
+          // an explicit md:text-5xl override, our display-size text is
+          // overwritten on desktop and the From amount renders smaller
+          // than the read-only To · expected span next to it. Mobile
+          // gets a smaller scale (36px) so a 4-digit amount + the
+          // chip + section padding fits a 375px viewport without
+          // truncating.
+          className="h-auto min-w-0 flex-1 border-0 bg-transparent px-0 font-mono text-[2.25rem] font-medium tabular-nums tracking-tight shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/40 dark:bg-transparent sm:text-[2.75rem] md:text-5xl"
         />
-        <Select
-          value={symbol}
-          onValueChange={(v) => v && onSymbolChange(v as TokenSymbol)}
-          disabled={!chainId || tokens.length === 0}
-        >
-          <SelectTrigger className="h-10 min-w-[6.5rem] rounded-full border-border/70 bg-card/60 px-3.5 text-sm font-semibold backdrop-blur-md transition-colors hover:border-primary/40">
-            <SelectValue placeholder="Token" />
-          </SelectTrigger>
-          <SelectContent>
-            {tokens.map((token) => (
-              <SelectItem key={token.symbol} value={token.symbol}>
-                {token.symbol}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <TokenChainChip
+          chainId={chainId}
+          symbol={symbol}
+          onClick={onChipClick}
+          disabled={chainSwitchPending}
+          placeholderChainName={placeholderChainName}
+        />
       </div>
       <Label htmlFor={fieldId} className="sr-only">
-        {amountLabel}
+        From amount
       </Label>
     </div>
   );
 }
 
+/**
+ * Read-only destination side. Displays the indicative-rate expected
+ * output. The user adjusts the actual on-chain min via the slippage
+ * row below; this section is informational only, no input. A subtle
+ * "expected" cyan label disambiguates from the on-chain floor.
+ */
+function ToSide({
+  chainId,
+  symbol,
+  expected,
+  onChipClick,
+  placeholderChainName,
+  chainSwitchPending,
+}: {
+  chainId: number | undefined;
+  symbol: TokenSymbol;
+  expected: number | null;
+  onChipClick: () => void;
+  placeholderChainName: string;
+  chainSwitchPending: boolean;
+}) {
+  const display = formatExpected(expected);
+  return (
+    <div className="rounded-2xl bg-background/40 p-5 ring-1 ring-foreground/5 hover:bg-background/50">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/85">
+        To · expected
+      </div>
+      <div className="mt-3 flex items-center justify-between gap-4">
+        <span
+          className={
+            'min-w-0 flex-1 truncate font-mono text-[2.25rem] font-medium tabular-nums tracking-tight sm:text-[2.75rem] md:text-5xl ' +
+            (display ? 'text-foreground' : 'text-muted-foreground/40')
+          }
+        >
+          {display || '0.0'}
+        </span>
+        <TokenChainChip
+          chainId={chainId}
+          symbol={symbol}
+          onClick={onChipClick}
+          disabled={chainSwitchPending}
+          placeholderChainName={placeholderChainName}
+        />
+      </div>
+    </div>
+  );
+}
+
+function SlippageRow({
+  slippageBps,
+  onChange,
+  minDest,
+  destSymbol,
+  rate,
+  srcSymbol,
+}: {
+  slippageBps: number;
+  onChange: (next: number) => void;
+  minDest: number | null;
+  destSymbol: TokenSymbol;
+  rate: number;
+  srcSymbol: TokenSymbol;
+}) {
+  return (
+    <div className="mt-5 rounded-2xl bg-background/40 px-5 py-4 ring-1 ring-foreground/5">
+      <div className="flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Slippage
+          </span>
+          <div className="flex items-center gap-1">
+            {SLIPPAGE_OPTIONS_BPS.map((bps) => (
+              <SlippagePill
+                key={bps}
+                bps={bps}
+                active={bps === slippageBps}
+                onClick={() => onChange(bps)}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="text-right">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Min received
+          </div>
+          <div className="mt-0.5 font-mono text-[13px] tabular-nums text-foreground">
+            {minDest === null
+              ? 'Enter amount'
+              : `≥ ${formatExpected(minDest)} ${destSymbol}`}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-3 flex items-center justify-between border-t border-foreground/5 pt-3 text-xs">
+        <span className="text-muted-foreground">Indicative rate</span>
+        <span className="font-mono tabular-nums text-muted-foreground">
+          {isFinite(rate)
+            ? `1 ${srcSymbol} ≈ ${formatExpected(rate)} ${destSymbol}`
+            : '—'}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function SlippagePill({
+  bps,
+  active,
+  onClick,
+}: {
+  bps: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        'rounded-md px-2.5 py-1 text-[11px] font-semibold tracking-tight transition-colors ' +
+        (active
+          ? 'bg-primary/15 text-primary ring-1 ring-primary/40'
+          : 'bg-card/70 text-muted-foreground ring-1 ring-foreground/10 hover:text-foreground')
+      }
+    >
+      {bps / 100}%
+    </button>
+  );
+}
+
+function FlipDivider({onFlip, disabled}: {onFlip: () => void; disabled: boolean}) {
+  return (
+    <div className="relative -my-1 flex items-center justify-center">
+      <button
+        type="button"
+        aria-label="Flip swap direction"
+        onClick={onFlip}
+        disabled={disabled}
+        className="flex size-10 items-center justify-center rounded-xl bg-card text-foreground ring-1 ring-foreground/15 transition-all hover:bg-card hover:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <ArrowDown className="size-4" aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
