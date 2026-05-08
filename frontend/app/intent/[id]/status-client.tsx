@@ -8,8 +8,7 @@ import {IntentActions} from '@/components/IntentActions';
 import {useIntent} from '@/hooks/useIntents';
 import {useIntentStatus} from '@/hooks/useIntentStatus';
 import {chainShortName} from '@/lib/chains';
-import {findToken} from '@/lib/tokens';
-import {formatUnits} from 'viem';
+import {formatTokenAmount, truncateAddress} from '@/lib/format';
 import type {IntentRecord} from '@/lib/types';
 
 /**
@@ -114,16 +113,14 @@ export function IntentStatusClient({id}: {id: string}) {
 }
 
 function DetailGrid({intent}: {intent: IntentRecord}) {
-  const sourceToken = findToken(intent.sourceChainId, 'ETH'); // unused fallback; real token from address
   const sourceLabel = formatTokenAmount(intent.sourceAmount, intent.sourceToken, intent.sourceChainId);
   const destLabel = formatTokenAmount(intent.minDestAmount, intent.destToken, intent.destChainId);
-  void sourceToken;
   return (
     <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
       <Row label="From" value={`${sourceLabel} on ${chainShortName(intent.sourceChainId)}`} />
       <Row label="To (min)" value={`${destLabel} on ${chainShortName(intent.destChainId)}`} />
-      <Row label="User" value={truncate(intent.user)} mono />
-      <Row label="Refund to" value={truncate(intent.refundTo)} mono />
+      <Row label="User" value={truncateAddress(intent.user)} mono />
+      <Row label="Refund to" value={truncateAddress(intent.refundTo)} mono />
       <Row label="Deadline" value={new Date(intent.deadline * 1000).toLocaleString()} />
       <Row label="Nonce" value={intent.nonce} mono />
     </dl>
@@ -139,20 +136,3 @@ function Row({label, value, mono}: {label: string; value: string; mono?: boolean
   );
 }
 
-const truncate = (addr: string): string =>
-  addr.length === 42 ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : addr;
-
-/** Format a uint256 amount for display by looking up the token's
- *  decimals on its chain. Falls back to the raw string when the token
- *  isn't in the registry (unsupported chain, custom token). */
-function formatTokenAmount(amountWei: string, tokenAddr: string, chainId: number): string {
-  // Search every supported chain's registry — the user might be looking
-  // at an intent on a chain the connected wallet isn't on.
-  for (const symbol of ['ETH', 'USDC', 'USDT'] as const) {
-    const token = findToken(chainId, symbol);
-    if (token && token.address.toLowerCase() === tokenAddr.toLowerCase()) {
-      return `${formatUnits(BigInt(amountWei), token.decimals)} ${token.symbol}`;
-    }
-  }
-  return `${amountWei} (${truncate(tokenAddr)})`;
-}

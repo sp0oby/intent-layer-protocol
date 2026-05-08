@@ -4,6 +4,7 @@ import {Check, Circle, Clock, X} from 'lucide-react';
 import {motion} from 'framer-motion';
 import {cn} from '@/lib/utils';
 import {useNowSeconds} from '@/hooks/useNow';
+import {buildSteps, type StepStatus} from '@/lib/timeline';
 import type {IntentState} from '@/lib/types';
 
 /**
@@ -16,73 +17,10 @@ import type {IntentState} from '@/lib/types';
  * Auction is treated as a sub-state of "matching in progress" — when
  * state === AUCTIONING the Matched step shows "Auction open" beneath
  * its label.
+ *
+ * The pure step-mapping logic lives in lib/timeline.ts so it can be
+ * unit-tested without rendering React.
  */
-
-type StepStatus = 'past' | 'active' | 'future';
-
-interface Step {
-  key: 'submitted' | 'matched' | 'settled' | 'cancelled' | 'refunded';
-  label: string;
-  description?: string;
-  status: StepStatus;
-  /** Off-path nodes (cancelled / refunded) render with an X icon
-   *  instead of the standard check. */
-  offPath?: boolean;
-}
-
-function buildSteps(state: IntentState): Step[] {
-  if (state === 'CANCELLED') {
-    return [
-      {key: 'submitted', label: 'Submitted', status: 'past'},
-      {key: 'cancelled', label: 'Cancelled', status: 'active', offPath: true},
-    ];
-  }
-  if (state === 'REFUNDED') {
-    return [
-      {key: 'submitted', label: 'Submitted', status: 'past'},
-      {key: 'matched', label: 'Matched', status: 'past'},
-      {
-        key: 'refunded',
-        label: 'Refunded',
-        description: 'LayerZero timeout',
-        status: 'active',
-        offPath: true,
-      },
-    ];
-  }
-  if (state === 'PENDING') {
-    return [
-      {key: 'submitted', label: 'Submitted', status: 'past'},
-      {key: 'matched', label: 'Matching…', description: 'Looking for a counterparty', status: 'active'},
-      {key: 'settled', label: 'Settled', status: 'future'},
-    ];
-  }
-  if (state === 'AUCTIONING') {
-    return [
-      {key: 'submitted', label: 'Submitted', status: 'past'},
-      {
-        key: 'matched',
-        label: 'Auction open',
-        description: 'Solvers competing to fill',
-        status: 'active',
-      },
-      {key: 'settled', label: 'Settled', status: 'future'},
-    ];
-  }
-  if (state === 'MATCHED' || state === 'LOCKED') {
-    return [
-      {key: 'submitted', label: 'Submitted', status: 'past'},
-      {key: 'matched', label: 'Matched', status: 'past'},
-      {key: 'settled', label: 'Settling…', description: 'Cross-chain delivery in flight', status: 'active'},
-    ];
-  }
-  // SETTLED
-  return [
-    {key: 'submitted', label: 'Submitted', status: 'past'},
-    {key: 'matched', label: 'Matched', status: 'past'},
-    {key: 'settled', label: 'Settled', status: 'past'},
-  ];
-}
 
 export function IntentStatusTimeline({state}: {state: IntentState}) {
   const steps = buildSteps(state);

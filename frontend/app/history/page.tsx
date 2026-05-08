@@ -18,8 +18,7 @@ import {
 import {useIntentHistory} from '@/hooks/useIntents';
 import {useNowSeconds} from '@/hooks/useNow';
 import {chainShortName} from '@/lib/chains';
-import {findToken} from '@/lib/tokens';
-import {formatUnits} from 'viem';
+import {formatTokenAmount, relativeTime} from '@/lib/format';
 import type {IntentRecord, IntentState} from '@/lib/types';
 
 const PAGE_SIZE = 20;
@@ -201,23 +200,3 @@ function StateBadge({state}: {state: IntentState}) {
   );
 }
 
-/** Relative time helper. ago-style for past timestamps; falls back to
- *  "just now" when the diff is below 1 minute. */
-function relativeTime(secondsAgo: number): string {
-  if (secondsAgo < 60) return 'just now';
-  if (secondsAgo < 3600) return `${Math.floor(secondsAgo / 60)}m ago`;
-  if (secondsAgo < 86_400) return `${Math.floor(secondsAgo / 3600)}h ago`;
-  return `${Math.floor(secondsAgo / 86_400)}d ago`;
-}
-
-/** Format a uint256 amount via the per-chain token registry. Falls back
- *  to the raw string + truncated address for unknown tokens. */
-function formatTokenAmount(amountWei: string, tokenAddr: string, chainId: number): string {
-  for (const symbol of ['ETH', 'USDC', 'USDT'] as const) {
-    const token = findToken(chainId, symbol);
-    if (token && token.address.toLowerCase() === tokenAddr.toLowerCase()) {
-      return `${formatUnits(BigInt(amountWei), token.decimals)} ${token.symbol}`;
-    }
-  }
-  return `${amountWei} (${tokenAddr.slice(0, 6)}…)`;
-}

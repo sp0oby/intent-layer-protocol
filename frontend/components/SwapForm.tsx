@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/select';
 import {SubmitIntentButton} from '@/components/SubmitIntentButton';
 import {chainShortName, isSupportedChain} from '@/lib/chains';
+import {sanitizeDecimal} from '@/lib/decimal-input';
 import {findToken, partnerChainOf, tokensForChain, type TokenSymbol} from '@/lib/tokens';
 
 /** Default intent deadline. The matcher's poll cadence + LZ delivery
@@ -192,12 +193,3 @@ function Side({
   );
 }
 
-/** Drop anything that isn't a digit or decimal separator. Keeps the
- *  field stable when the user pastes formatted text (commas, spaces). */
-function sanitizeDecimal(input: string): string {
-  // Allow at most one dot. Strip everything else.
-  const cleaned = input.replace(/[^0-9.]/g, '');
-  const firstDot = cleaned.indexOf('.');
-  if (firstDot < 0) return cleaned;
-  return cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, '');
-}
