@@ -57,6 +57,9 @@ function makeRepoWithPool(rows: IntentRecord[]): OrderBookRepository {
     withTransaction: vi.fn(async <T>(fn: (client: never) => Promise<T>) => fn(undefined as never)),
     listMatchEligible: vi.fn(async (chainId: number) => rows.filter((r) => r.sourceChainId === chainId)),
     getIntent: vi.fn(async (hash: string) => rows.find((r) => r.intentHash === hash) ?? null),
+    listEligibleForAuctionOpen: vi.fn(async () => []),
+    listEligibleForAuctionFinalize: vi.fn(async () => []),
+    listIntentsByUser: vi.fn(async () => []),
   };
 }
 

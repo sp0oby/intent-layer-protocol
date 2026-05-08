@@ -47,3 +47,18 @@ export function useIntent(intentHash: string | undefined) {
     refetchInterval: 5_000,
   });
 }
+
+/** Paginated history for one user. Disabled until a wallet connects.
+ *  The /history page composes this with a Load-more button driven by the
+ *  hasMore flag. */
+export function useIntentHistory(
+  userAddress: string | undefined,
+  {limit = 20, offset = 0}: {limit?: number; offset?: number} = {}
+) {
+  return useQuery({
+    queryKey: ['intents', 'by-user', userAddress?.toLowerCase(), limit, offset],
+    enabled: typeof userAddress === 'string' && /^0x[0-9a-fA-F]{40}$/.test(userAddress),
+    queryFn: () => api.listByUser(userAddress as string, {limit, offset}),
+    refetchInterval: 7_500,
+  });
+}

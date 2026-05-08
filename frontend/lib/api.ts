@@ -32,6 +32,11 @@ export interface IntentResponse {
   intent: IntentRecord;
 }
 
+export interface UserIntentsResponse {
+  intents: IntentRecord[];
+  hasMore: boolean;
+}
+
 export const api = {
   listUnmatched: (chainId?: number): Promise<ListIntentsResponse> =>
     getJson(`/api/intents/unmatched${chainId ? `?chainId=${chainId}` : ''}`),
@@ -41,6 +46,13 @@ export const api = {
 
   getIntent: (intentHash: string): Promise<IntentResponse> =>
     getJson(`/api/intents/${intentHash}`),
+
+  /** History list for one user. limit ≤ 100 (server-enforced). */
+  listByUser: (
+    userAddress: string,
+    {limit = 20, offset = 0}: {limit?: number; offset?: number} = {}
+  ): Promise<UserIntentsResponse> =>
+    getJson(`/api/intents?user=${userAddress}&limit=${limit}&offset=${offset}`),
 
   /** WebSocket URL for real-time intent events keyed by hash. The hook
    *  layer wraps this in a connection lifecycle. */

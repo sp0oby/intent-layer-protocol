@@ -60,6 +60,12 @@ function makeRepo(rows: IntentRecord[]): OrderBookRepository {
     getIntent: vi.fn(async (hash: string) => rows.find((r) => r.intentHash === hash) ?? null),
     listEligibleForAuctionOpen: vi.fn(async () => []),
     listEligibleForAuctionFinalize: vi.fn(async () => []),
+    listIntentsByUser: vi.fn(async (userAddr: string, limit: number, offset: number) => {
+      const filtered = rows
+        .filter((r) => r.user.toLowerCase() === userAddr.toLowerCase())
+        .sort((a, b) => (b.submittedAtBlockTs ?? 0) - (a.submittedAtBlockTs ?? 0));
+      return filtered.slice(offset, offset + limit);
+    }),
   };
 }
 
@@ -134,6 +140,61 @@ describe('GET /api/intents/auctioning', () => {
     expect(res.status).toBe(200);
     expect(res.body.intents).toHaveLength(1);
     expect(res.body.intents[0].state).toBe('AUCTIONING');
+  });
+});
+
+describe('GET /api/intents (history by user)', () => {
+  // Use a real lowercase Ethereum address since the route validates the
+  // 0x-prefixed 40-hex shape strictly.
+  const USER = '0x70997970c51812dc3a010c7d01b50e0d17dc79c8';
+  const OTHER = '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc';
+
+  it('returns the user\'s intents newest-first', async () => {
+    const rows = [
+      intent({intentHash: '0x' + 'a'.repeat(64), user: USER, state: 'PENDING', submittedAtBlockTs: NOW - 60}),
+      intent({intentHash: '0x' + 'b'.repeat(64), user: USER, state: 'SETTLED', submittedAtBlockTs: NOW - 600, nonce: '2'}),
+      intent({intentHash: '0x' + 'c'.repeat(64), user: OTHER, state: 'PENDING', submittedAtBlockTs: NOW - 30, nonce: '3'}),
+    ];
+    const app = createApp({repo: makeRepo(rows), config});
+    const res = await request(app).get(`/api/intents?user=${USER}`);
+    expect(res.status).toBe(200);
+    expect(res.body.intents.map((i: {intentHash: string}) => i.intentHash)).toEqual([
+      '0x' + 'a'.repeat(64), // newer first
+      '0x' + 'b'.repeat(64),
+    ]);
+    expect(res.body.hasMore).toBe(false);
+  });
+
+  it('400s when user is missing or malformed', async () => {
+    const app = createApp({repo: makeRepo([]), config});
+    expect((await request(app).get('/api/intents')).status).toBe(400);
+    expect((await request(app).get('/api/intents?user=notahex')).status).toBe(400);
+  });
+
+  it('honours limit + offset and surfaces hasMore', async () => {
+    const rows = Array.from({length: 25}).map((_, i) =>
+      intent({
+        intentHash: '0x' + i.toString(16).padStart(64, '0'),
+        user: USER,
+        nonce: String(i + 1),
+        submittedAtBlockTs: NOW - i,
+      })
+    );
+    const app = createApp({repo: makeRepo(rows), config});
+    const first = await request(app).get(`/api/intents?user=${USER}&limit=10&offset=0`);
+    expect(first.status).toBe(200);
+    expect(first.body.intents).toHaveLength(10);
+    expect(first.body.hasMore).toBe(true);
+
+    const last = await request(app).get(`/api/intents?user=${USER}&limit=10&offset=20`);
+    expect(last.body.intents).toHaveLength(5);
+    expect(last.body.hasMore).toBe(false);
+  });
+
+  it('400s on out-of-range limit', async () => {
+    const app = createApp({repo: makeRepo([]), config});
+    expect((await request(app).get(`/api/intents?user=${USER}&limit=0`)).status).toBe(400);
+    expect((await request(app).get(`/api/intents?user=${USER}&limit=999`)).status).toBe(400);
   });
 });
 

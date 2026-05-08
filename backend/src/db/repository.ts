@@ -115,6 +115,11 @@ export interface OrderBookRepository {
   /** Single-intent lookup by hash (for the API and for matched-pair lookup). */
   getIntent(intentHash: string): Promise<IntentRecord | null>;
 
+  /** All intents created by `userAddr`, newest first. Used by the
+   *  frontend history page. Limit caps the page size; offset enables
+   *  Load-more pagination. Caller is expected to validate the address. */
+  listIntentsByUser(userAddr: string, limit: number, offset: number): Promise<IntentRecord[]>;
+
   /** Intents currently PENDING whose submission timestamp + auctionDelaySec
    *  has passed. The orchestrator opens an auction on each. */
   listEligibleForAuctionOpen(
@@ -359,6 +364,23 @@ export function pgRepository(pool: Pool): OrderBookRepository {
       );
       if (result.rowCount === 0) return null;
       return rowToIntentRecord(result.rows[0]);
+    },
+
+    async listIntentsByUser(userAddr, limit, offset) {
+      // Newest first via submitted_at_block_ts. created_at is the row
+      // insert time (server clock) — used as a tiebreaker for intents
+      // landing in the same block.
+      const result: QueryResult<IntentRow> = await pool.query(
+        `SELECT intent_hash, user_address, refund_to, source_chain_id, source_token,
+                source_amount, dest_chain_id, dest_token, min_dest_amount, deadline,
+                nonce, state, submitted_at_block_ts, match_timestamp, auction_deadline
+           FROM intents
+          WHERE user_address = $1
+          ORDER BY submitted_at_block_ts DESC NULLS LAST, created_at DESC
+          LIMIT $2 OFFSET $3`,
+        [toBuffer(lower(userAddr)), limit, offset]
+      );
+      return result.rows.map(rowToIntentRecord);
     },
 
     async listEligibleForAuctionOpen(sourceChainId, nowSec, auctionDelaySec) {

@@ -27,6 +27,7 @@ function makeInner(): OrderBookRepository {
     getIntent: vi.fn(async () => null),
     listEligibleForAuctionOpen: vi.fn(async () => []),
     listEligibleForAuctionFinalize: vi.fn(async () => []),
+    listIntentsByUser: vi.fn(async () => []),
   };
 }
 

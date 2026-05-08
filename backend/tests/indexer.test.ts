@@ -57,6 +57,11 @@ function makeRepo() {
     readCursor: vi.fn(async () => null),
     advanceCursor: fakeAsync('advanceCursor'),
     withTransaction: vi.fn(async <T>(fn: (client: never) => Promise<T>) => fn(undefined as never)),
+    listMatchEligible: vi.fn(async () => []),
+    getIntent: vi.fn(async () => null),
+    listEligibleForAuctionOpen: vi.fn(async () => []),
+    listEligibleForAuctionFinalize: vi.fn(async () => []),
+    listIntentsByUser: vi.fn(async () => []),
   };
   return {repo, calls};
 }

@@ -48,6 +48,7 @@ function makeRepo(opts: {toOpen?: IntentRecord[]; toFinalize?: IntentRecord[]} =
     listEligibleForAuctionFinalize: vi.fn(async (chainId: number) =>
       (opts.toFinalize ?? []).filter((i) => i.sourceChainId === chainId)
     ),
+    listIntentsByUser: vi.fn(async () => []),
   };
 }
 

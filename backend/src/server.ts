@@ -116,6 +116,31 @@ export function createApp(deps: ApiDependencies) {
     res.json({intents: intents.map(serialize)});
   });
 
+  // History list — every intent submitted by a given user, newest first.
+  // Used by the frontend /history page. Pagination via limit + offset
+  // query params (limit defaults to 20, capped at 100).
+  app.get('/api/intents', async (req: Request, res: Response) => {
+    const userParam = req.query.user;
+    if (typeof userParam !== 'string' || !/^0x[0-9a-fA-F]{40}$/.test(userParam)) {
+      res.status(400).json({error: 'user must be a 0x-prefixed 20-byte address'});
+      return;
+    }
+    const limitRaw = Number(req.query.limit ?? 20);
+    const offsetRaw = Number(req.query.offset ?? 0);
+    if (!Number.isFinite(limitRaw) || limitRaw < 1 || limitRaw > 100) {
+      res.status(400).json({error: 'limit must be 1..100'});
+      return;
+    }
+    if (!Number.isFinite(offsetRaw) || offsetRaw < 0) {
+      res.status(400).json({error: 'offset must be a non-negative integer'});
+      return;
+    }
+    // Fetch one extra row to derive a hasMore flag without a COUNT query.
+    const rows = await repo.listIntentsByUser(userParam, limitRaw + 1, offsetRaw);
+    const hasMore = rows.length > limitRaw;
+    res.json({intents: rows.slice(0, limitRaw).map(serialize), hasMore});
+  });
+
   // Single intent by hash. Used by the frontend status page polling fallback.
   app.get('/api/intents/:hash', async (req: Request, res: Response) => {
     const hash = req.params.hash;

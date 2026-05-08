@@ -189,5 +189,12 @@ export function createInMemoryRepository(): OrderBookRepository {
           i.auctionDeadline < nowSec
       );
     },
+
+    async listIntentsByUser(userAddr, limit, offset) {
+      const filtered = [...intents.values()]
+        .filter((i) => i.user.toLowerCase() === userAddr.toLowerCase())
+        .sort((a, b) => (b.submittedAtBlockTs ?? 0) - (a.submittedAtBlockTs ?? 0));
+      return filtered.slice(offset, offset + limit);
+    },
   };
 }

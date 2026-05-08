@@ -97,6 +97,7 @@ export function publishingRepository(inner: OrderBookRepository, bus: IntentEven
     readCursor: inner.readCursor.bind(inner),
     advanceCursor: inner.advanceCursor.bind(inner),
     withTransaction: inner.withTransaction.bind(inner),
+    listIntentsByUser: inner.listIntentsByUser.bind(inner),
     listMatchEligible: inner.listMatchEligible.bind(inner),
     getIntent: inner.getIntent.bind(inner),
     listEligibleForAuctionOpen: inner.listEligibleForAuctionOpen.bind(inner),
