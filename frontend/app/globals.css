@@ -1,22 +1,21 @@
 /*
- * Tailwind v4 + shadcn/ui — CSS-first config. Theme tokens live in the
- * @theme inline block below; light/dark values come from the :root and
- * .dark CSS variable blocks at the end.
+ * Tailwind v4 + shadcn/ui — CSS-first config.
  *
- * Wireframe phase: shadcn's "base" preset is grayscale-only (oklch with
- * 0 chroma). No accent colour, no logo treatment until the user signs
- * off on brand. See memory: feedback_frontend_stack.md "Wireframe phase".
+ * Theme: deep navy + electric cyan. Bold (high oklch chroma), not faded.
+ * Dark by default — :root carries the dark palette directly. A future
+ * `.light` block is left as a stub for an eventual theme toggle.
+ *
+ * Ambient backdrop: two soft radial blooms (cyan top-right, indigo
+ * bottom-left) painted on body so every route inherits the same depth.
+ * Cards are glass via bg-card/60 + backdrop-blur (see components/ui/card.tsx).
  */
 
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
 
-/* shadcn dark-mode variant: applies tokens scoped under a `.dark` ancestor. */
 @custom-variant dark (&:is(.dark *));
 
-/* shadcn token map — links the design-system names (background, primary,
- * card, etc.) to the CSS variables defined in :root / .dark below. */
 @theme inline {
   --font-heading: var(--font-sans);
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
@@ -63,77 +62,99 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Light theme — pure grayscale (oklch with 0 chroma). */
+/* Deep navy + electric cyan — the only palette the app uses today. */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* Surfaces */
+  --background: oklch(0.13 0.04 255);
+  --foreground: oklch(0.97 0.005 240);
+
+  /* Cards live above the ambient gradient — slightly lighter so the
+     glass blur (bg-card/60) reads correctly. */
+  --card: oklch(0.20 0.05 255);
+  --card-foreground: oklch(0.97 0.005 240);
+
+  /* Popovers are fully opaque so dropdowns / dialogs read on any backdrop. */
+  --popover: oklch(0.18 0.05 255);
+  --popover-foreground: oklch(0.97 0.005 240);
+
+  /* Bold electric cyan — primary CTA + active states. */
+  --primary: oklch(0.82 0.18 215);
+  --primary-foreground: oklch(0.13 0.04 255);
+
+  /* Secondary for non-primary actions. */
+  --secondary: oklch(0.28 0.04 255);
+  --secondary-foreground: oklch(0.97 0.005 240);
+
+  /* Muted for placeholder backgrounds + disabled states. */
+  --muted: oklch(0.22 0.04 255);
+  --muted-foreground: oklch(0.72 0.04 240);
+
+  /* Accent for hover backgrounds — quiet cyan. */
+  --accent: oklch(0.32 0.08 220);
+  --accent-foreground: oklch(0.97 0.005 240);
+
+  /* Bold destructive red, distinct from cyan. */
+  --destructive: oklch(0.66 0.24 25);
+
+  /* Borders + inputs at low alpha against the dark surface. */
+  --border: oklch(1 0 0 / 0.10);
+  --input: oklch(1 0 0 / 0.12);
+  --ring: oklch(0.82 0.18 215 / 0.55);
+
+  /* Chart colors — cyan + complementary hues. */
+  --chart-1: oklch(0.82 0.18 215);
+  --chart-2: oklch(0.72 0.18 280);
+  --chart-3: oklch(0.68 0.18 150);
+  --chart-4: oklch(0.78 0.18 60);
+  --chart-5: oklch(0.66 0.20 0);
+
+  /* Sidebar variants (used by some shadcn components, kept on-palette). */
+  --sidebar: oklch(0.16 0.04 255);
+  --sidebar-foreground: oklch(0.97 0.005 240);
+  --sidebar-primary: oklch(0.82 0.18 215);
+  --sidebar-primary-foreground: oklch(0.13 0.04 255);
+  --sidebar-accent: oklch(0.32 0.08 220);
+  --sidebar-accent-foreground: oklch(0.97 0.005 240);
+  --sidebar-border: oklch(1 0 0 / 0.10);
+  --sidebar-ring: oklch(0.82 0.18 215 / 0.55);
+
+  --radius: 0.75rem;
 }
 
-/* Dark theme — also pure grayscale; switch via a `.dark` class on <html>.
- * Theme toggle isn't shipped yet (waiting on brand decisions); the page
- * defaults to light. */
+/* `.dark` block kept identical to :root so adding the class anywhere is a
+   no-op. Replace with a `.light` block + a theme toggle if/when we ship one. */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: oklch(0.13 0.04 255);
+  --foreground: oklch(0.97 0.005 240);
+  --card: oklch(0.20 0.05 255);
+  --card-foreground: oklch(0.97 0.005 240);
+  --popover: oklch(0.18 0.05 255);
+  --popover-foreground: oklch(0.97 0.005 240);
+  --primary: oklch(0.82 0.18 215);
+  --primary-foreground: oklch(0.13 0.04 255);
+  --secondary: oklch(0.28 0.04 255);
+  --secondary-foreground: oklch(0.97 0.005 240);
+  --muted: oklch(0.22 0.04 255);
+  --muted-foreground: oklch(0.72 0.04 240);
+  --accent: oklch(0.32 0.08 220);
+  --accent-foreground: oklch(0.97 0.005 240);
+  --destructive: oklch(0.66 0.24 25);
+  --border: oklch(1 0 0 / 0.10);
+  --input: oklch(1 0 0 / 0.12);
+  --ring: oklch(0.82 0.18 215 / 0.55);
+  --chart-1: oklch(0.82 0.18 215);
+  --chart-2: oklch(0.72 0.18 280);
+  --chart-3: oklch(0.68 0.18 150);
+  --chart-4: oklch(0.78 0.18 60);
+  --chart-5: oklch(0.66 0.20 0);
+  --sidebar: oklch(0.16 0.04 255);
+  --sidebar-foreground: oklch(0.97 0.005 240);
+  --sidebar-primary: oklch(0.82 0.18 215);
+  --sidebar-primary-foreground: oklch(0.13 0.04 255);
+  --sidebar-accent: oklch(0.32 0.08 220);
+  --sidebar-accent-foreground: oklch(0.97 0.005 240);
+  --sidebar-border: oklch(1 0 0 / 0.10);
+  --sidebar-ring: oklch(0.82 0.18 215 / 0.55);
 }
 
 @layer base {
@@ -142,14 +163,36 @@
   }
   html {
     @apply font-sans;
+    color-scheme: dark;
   }
   body {
     @apply bg-background text-foreground;
+    /* Ambient bloom — two soft radials painted once on the body so every
+       route gets the same atmospheric backdrop. Fixed attachment so the
+       gradient doesn't tile during scroll. */
+    background-image:
+      radial-gradient(ellipse 90% 60% at 85% -10%, oklch(0.55 0.22 215 / 0.28), transparent 65%),
+      radial-gradient(ellipse 70% 55% at 0% 100%, oklch(0.45 0.20 280 / 0.22), transparent 65%);
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    min-height: 100vh;
+  }
+  /* Tabular numbers everywhere — DeFi UIs read amounts side-by-side. */
+  .font-mono,
+  [class*='font-mono'] {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
   }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+  /* Subtle inner glow on the primary CTA — used by Button.default below. */
+  .glow-primary {
+    box-shadow:
+      0 0 0 1px color-mix(in oklch, var(--primary) 30%, transparent),
+      0 8px 32px -8px color-mix(in oklch, var(--primary) 35%, transparent);
   }
 }

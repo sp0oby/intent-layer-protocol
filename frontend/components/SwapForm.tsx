@@ -78,13 +78,13 @@ export function SwapForm() {
   const destToken = useMemo(() => findToken(destChainId, destSymbol), [destChainId, destSymbol]);
 
   return (
-    <Card className="border-border/60">
-      <CardHeader>
-        <CardTitle className="text-2xl">Swap</CardTitle>
+    <Card className="border-border/40 shadow-2xl shadow-primary/5">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-2xl font-semibold tracking-tight">Swap</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-1.5">
         <Side
-          legend="From"
+          legend="You send"
           chainId={sourceChainId}
           tokens={sourceTokens}
           symbol={sourceSymbol}
@@ -95,25 +95,25 @@ export function SwapForm() {
           amountLabel="You send"
         />
 
-        <div className="flex items-center justify-center py-1">
-          <span className="flex size-7 items-center justify-center rounded-md border border-border bg-muted text-muted-foreground">
-            <ArrowDown className="size-3.5" aria-hidden="true" />
+        <div className="relative -my-3 flex items-center justify-center">
+          <span className="flex size-9 items-center justify-center rounded-xl border border-border bg-card/80 text-muted-foreground shadow-sm backdrop-blur-md transition-colors hover:border-primary/40 hover:text-foreground">
+            <ArrowDown className="size-4" aria-hidden="true" />
           </span>
         </div>
 
         <Side
-          legend="To"
+          legend="You receive (min)"
           chainId={destChainId}
           tokens={destTokens}
           symbol={destSymbol}
           onSymbolChange={setDestSymbol}
           amount={minDestAmount}
           onAmountChange={setMinDestAmount}
-          amountPlaceholder="Minimum received"
+          amountPlaceholder="0.0"
           amountLabel="You receive (min)"
         />
 
-        <div className="pt-3">
+        <div className="pt-4">
           <SubmitIntentButton
             sourceChainId={sourceChainId}
             destChainId={destChainId}
@@ -150,16 +150,18 @@ function Side({
   amountLabel: string;
   amountPlaceholder: string;
 }) {
-  const fieldId = `${legend.toLowerCase()}-amount`;
+  const fieldId = `${legend.toLowerCase().replace(/\s+/g, '-')}-amount`;
   return (
-    <div className="rounded-xl border border-border bg-muted/30 p-4">
-      <div className="flex items-baseline justify-between">
-        <span className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{legend}</span>
-        <span className="text-xs text-muted-foreground">
+    <div className="group/side rounded-2xl border border-border/60 bg-background/40 p-4 transition-colors focus-within:border-primary/40 hover:border-border">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+          {legend}
+        </span>
+        <span className="text-xs font-medium text-muted-foreground">
           {chainId ? chainShortName(chainId) : '— connect wallet —'}
         </span>
       </div>
-      <div className="mt-2 flex items-center gap-3">
+      <div className="mt-3 flex items-center gap-3">
         <Input
           id={fieldId}
           inputMode="decimal"
@@ -167,14 +169,14 @@ function Side({
           onChange={(e) => onAmountChange(sanitizeDecimal(e.target.value))}
           placeholder={amountPlaceholder}
           disabled={!chainId}
-          className="border-0 bg-transparent px-0 text-2xl font-medium shadow-none focus-visible:ring-0 dark:bg-transparent"
+          className="h-auto border-0 bg-transparent px-0 font-mono text-3xl font-semibold tabular-nums shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/40 dark:bg-transparent"
         />
         <Select
           value={symbol}
           onValueChange={(v) => v && onSymbolChange(v as TokenSymbol)}
           disabled={!chainId || tokens.length === 0}
         >
-          <SelectTrigger className="h-9 min-w-[6.5rem]">
+          <SelectTrigger className="h-10 min-w-[6.5rem] rounded-full border-border/70 bg-card/60 px-3.5 text-sm font-semibold backdrop-blur-md transition-colors hover:border-primary/40">
             <SelectValue placeholder="Token" />
           </SelectTrigger>
           <SelectContent>

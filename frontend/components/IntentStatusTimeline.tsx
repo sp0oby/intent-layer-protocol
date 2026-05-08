@@ -60,8 +60,8 @@ function Indicator({status, offPath}: {status: StepStatus; offPath?: boolean}) {
   }
   if (status === 'past') {
     return (
-      <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border border-border bg-foreground text-background">
-        <Check className="size-3" aria-hidden="true" />
+      <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_0_12px_color-mix(in_oklch,var(--color-primary)_35%,transparent)]">
+        <Check className="size-3" strokeWidth={3} aria-hidden="true" />
       </span>
     );
   }
@@ -69,9 +69,9 @@ function Indicator({status, offPath}: {status: StepStatus; offPath?: boolean}) {
     // Quiet 1.6s pulse on the dot — the only motion in the component.
     // No celebratory burst, no scale animation.
     return (
-      <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border border-foreground/40 bg-background">
+      <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-card/60 backdrop-blur-md">
         <motion.span
-          className="size-2 rounded-full bg-foreground"
+          className="size-2 rounded-full bg-primary shadow-[0_0_8px_var(--color-primary)]"
           animate={{opacity: [0.35, 1, 0.35]}}
           transition={{repeat: Infinity, duration: 1.6, ease: 'easeInOut'}}
           aria-hidden="true"
@@ -80,8 +80,8 @@ function Indicator({status, offPath}: {status: StepStatus; offPath?: boolean}) {
     );
   }
   return (
-    <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border border-border bg-background text-muted-foreground">
-      <Circle className="size-2 fill-current" aria-hidden="true" />
+    <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border border-border/60 bg-background/40 text-muted-foreground/60">
+      <Circle className="size-1.5 fill-current" aria-hidden="true" />
     </span>
   );
 }

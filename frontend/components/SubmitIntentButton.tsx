@@ -136,7 +136,7 @@ export function SubmitIntentButton({
   if (!isConnected) {
     return (
       <>
-        <Button className="w-full" size="lg" onClick={() => setPickerOpen(true)}>
+        <Button className="h-12 w-full rounded-xl text-sm font-semibold" size="lg" onClick={() => setPickerOpen(true)}>
           Connect wallet
         </Button>
         <WalletPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} />
@@ -147,7 +147,7 @@ export function SubmitIntentButton({
   if (!isSupportedChain(connectedChainId)) {
     return (
       <Button
-        className="w-full"
+        className="h-12 w-full rounded-xl text-sm font-semibold"
         size="lg"
         disabled={switchPending}
         onClick={() => switchChain({chainId: 1})}
@@ -159,7 +159,7 @@ export function SubmitIntentButton({
 
   if (!settlerConfigured) {
     return (
-      <Button className="w-full" size="lg" disabled>
+      <Button className="h-12 w-full rounded-xl text-sm font-semibold" size="lg" disabled>
         Settler not deployed on {chainShortName(connectedChainId)}
       </Button>
     );
@@ -167,7 +167,7 @@ export function SubmitIntentButton({
 
   if (!sourceToken || !destToken) {
     return (
-      <Button className="w-full" size="lg" disabled>
+      <Button className="h-12 w-full rounded-xl text-sm font-semibold" size="lg" disabled>
         Pick tokens
       </Button>
     );
@@ -175,7 +175,7 @@ export function SubmitIntentButton({
 
   if (sourceToken.symbol === destToken.symbol && sourceChainId === destChainId) {
     return (
-      <Button className="w-full" size="lg" disabled>
+      <Button className="h-12 w-full rounded-xl text-sm font-semibold" size="lg" disabled>
         Same token, same chain — pick a real swap
       </Button>
     );
@@ -183,7 +183,7 @@ export function SubmitIntentButton({
 
   if (!parsed) {
     return (
-      <Button className="w-full" size="lg" disabled>
+      <Button className="h-12 w-full rounded-xl text-sm font-semibold" size="lg" disabled>
         Enter an amount
       </Button>
     );
@@ -197,14 +197,14 @@ export function SubmitIntentButton({
 
     if (approveReceipt.isLoading) {
       return (
-        <Button className="w-full" size="lg" disabled>
+        <Button className="h-12 w-full rounded-xl text-sm font-semibold" size="lg" disabled>
           Approving…
         </Button>
       );
     }
     if (approve.isPending) {
       return (
-        <Button className="w-full" size="lg" disabled>
+        <Button className="h-12 w-full rounded-xl text-sm font-semibold" size="lg" disabled>
           Confirm approval in wallet
         </Button>
       );
@@ -212,7 +212,7 @@ export function SubmitIntentButton({
     if (needsApproval && settlerAddress) {
       return (
         <Button
-          className="w-full"
+          className="glow-primary h-12 w-full rounded-xl text-sm font-semibold"
           size="lg"
           onClick={() =>
             approve.writeContract({
@@ -233,14 +233,14 @@ export function SubmitIntentButton({
   // Submit path
   if (submitReceipt.isLoading) {
     return (
-      <Button className="w-full" size="lg" disabled>
+      <Button className="h-12 w-full rounded-xl text-sm font-semibold" size="lg" disabled>
         Submitting…
       </Button>
     );
   }
   if (submit.isPending) {
     return (
-      <Button className="w-full" size="lg" disabled>
+      <Button className="h-12 w-full rounded-xl text-sm font-semibold" size="lg" disabled>
         Confirm submission in wallet
       </Button>
     );
@@ -248,7 +248,7 @@ export function SubmitIntentButton({
 
   return (
     <Button
-      className="w-full"
+      className="glow-primary h-12 w-full rounded-xl text-sm font-semibold"
       size="lg"
       onClick={() => {
         if (!address || !sourceChainId || !destChainId || !settlerAddress) return;
