@@ -223,15 +223,21 @@ LAYERZERO_BASE_ADDRESS=0x...
 ## Frontend (Web UI)
 
 ### Language
-- **TypeScript + React 18+**
-- Reason: Type-safe, massive ecosystem, best for crypto UX
+- **TypeScript 5 + React 19**
+- Reason: Type-safe, massive ecosystem, best for crypto UX. React 19 strict rules (purity / set-state-in-effect / refs / static-components) enforced.
 
 ### Framework
-- **Next.js 14** (App Router)
-  - Built-in API routes
-  - Server-side rendering
-  - Static generation
-  - Excellent DX
+- **Next.js 16** (App Router, Turbopack)
+  - Server Components + dynamic params (`Promise<{id: string}>` for route segments)
+  - Metadata API (title template, OpenGraph, Twitter, viewport themeColor)
+  - Built-in dev server with fast refresh
+
+### Styling + UI
+
+- **Tailwind CSS v4** (CSS-first config in `globals.css`)
+- **shadcn/ui** primitives (base-ui under the hood) — Dialog, Select, Input, Button, Tabs, Skeleton, Card, Sonner toast
+- **Framer Motion** — quiet motion only (no celebratory animations); state-driven cyan-glow on RoutePreview steps
+- Glass-card design language with `backdrop-blur-2xl`, deep-navy + electric-cyan oklch palette
 
 ### Key Libraries
 

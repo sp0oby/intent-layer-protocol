@@ -29,7 +29,7 @@ Week 5-6 — Auction & Solvers
 - [x] Integrate solver auction flow into matching engine — `AuctionOrchestrator` opens windows after `AUCTION_DELAY` and finalizes via `executeWinningProposal` (Stage 4)
 
 Week 7 — Frontend MVP
-- [x] Implement React swap UI (Next.js) with MetaMask via wagmi — **Uniswap-style one-click minimal UX** (Stage 5.2 ships the chained approve+submit form on Next 16 / React 19 / Tailwind v4 / shadcn / wagmi v3)
+- [x] Implement React swap UI (Next.js) with MetaMask via wagmi — **Across-style swap card** with combined token+chain picker dialog, indicative-rate auto-fill, slippage selector, settings popover (deadline + refund-to override), chained approve + submit flow. Next 16 / React 19 / Tailwind v4 / shadcn / wagmi v3 + viem / TanStack Query / Zustand. State-driven status page with live solver-bid feed and per-state tx-hash explorer chips. Mobile-responsive at 375px. (Stage 5.Z complete)
 - [x] Show intent lifecycle and links to tx explorers — animated status timeline ships in 5.3 (per-state explorer links pending tx-hash exposure in IntentRecord, task #67)
 - [ ] Connect frontend to backend API and test submission flow — code complete; end-to-end manual verification blocked by issue #29 (suspected CORS)
 
@@ -78,9 +78,9 @@ Backend
 - [ ] End-to-end integration test against deployed contracts on local Anvil (in progress)
 
 Frontend
-- [ ] User can submit intents via wallet (MetaMask) — code complete (Stage 5.2 chained approve + submit form, multi-wallet picker); end-to-end manual verification blocked by issue #29
-- [ ] UI shows real-time intent status and explorer links — code complete (Stage 5.3 animated state-machine timeline + WebSocket subscription); explorer links pending tx-hash exposure in IntentRecord (task #67) and end-to-end manual verification (#29)
-- [ ] User can cancel unmatched intents — code complete (cancel button on /intent/[hash] when state ∈ {PENDING, AUCTIONING}); end-to-end manual verification blocked by #29
+- [x] User can submit intents via wallet (MetaMask) — Stage 5.Z verified end-to-end on `npm run local-stack` (multi-wallet picker, chained approve + submit, indicative-rate auto-fill + slippage selector, settings popover for deadline + refund-to)
+- [x] UI shows real-time intent status and explorer links — Stage 5.Z complete: state-driven RoutePreview + WebSocket subscription, per-state tx hash chips with block-explorer URLs (mainnet / base / sepolia / base-sepolia), live solver-bid feed on the status page (closes #67)
+- [x] User can cancel unmatched intents — Stage 5.Z verified: cancel + refund actions on /intent/[hash] wired to IntentSettler.cancelIntent / refundIfLzTimeout
 
 Security & Reliability
 - [ ] Unit & integration test coverage >= 90%
@@ -108,5 +108,5 @@ Operations
 | | |
 |:---|:---|
 | **Version** | 1.2 |
-| **Last updated** | 2026-05-07 |
-| **Status** | Weeks 1-6 contract scope complete; Stage 4 (backend services) feature-complete locally with E2E coverage; Stage 5 (frontend wiring) is the next milestone |
+| **Last updated** | 2026-05-08 |
+| **Status** | Weeks 1-6 contract scope complete; Stage 4 (backend services) feature-complete locally with E2E coverage; Stage 5 (frontend) feature-complete and pushed to main with full local-stack verification; Stage 6 (integration tests + gas benchmarking) is the next milestone, with auction → settlement chaining (#30) carried over from Stage 5 |

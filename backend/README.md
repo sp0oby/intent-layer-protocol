@@ -83,9 +83,13 @@ Copy [`.env.example`](../.env.example) to `.env` at repo root or set variables i
 | `GET /health` | Returns `{ok, database}` (probes pg) |
 | `GET /api/intents/unmatched?chainId=` | Match-eligible intents (`PENDING` or `AUCTIONING`, not expired) |
 | `GET /api/intents/auctioning?chainId=` | Subset filter — only intents currently in the auction window |
-| `GET /api/intents/:hash` | Single intent lookup |
+| `GET /api/intents/:hash` | Single intent lookup; surfaces `submitTxHash / matchTxHash / settleTxHash / cancelTxHash / refundTxHash` for the frontend's per-state explorer chips |
+| `GET /api/intents/:hash/proposals` | Live solver-bid feed for the frontend status page (oldest-first); powers the auction view |
+| `GET /api/intents?user=&limit=&offset=` | Paginated history for one user; powers the frontend `/history` page |
 | `POST /api/solver/proposals` | Verify `SolverAuction.proposalDigest` ECDSA signature, persist |
 | `WS  /ws?intentHash=` | Subscribe to real-time intent events: `Subscribed`, `StateChange`, `ProposalSubmitted`, `WinnerSelected` |
+
+CORS: `backend/src/server.ts` allowlists `http://localhost:3000` + `http://127.0.0.1:3000` by default. Extend via the `CORS_ORIGIN` env var (comma-separated) for deployed environments.
 
 ---
 
