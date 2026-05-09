@@ -8,7 +8,7 @@
 ## Phase 1: Ethereum ↔ Base Simple Intent Matching
 
 **Duration:** 8–12 weeks (indicative)  
-**Implementation status:** Scaffolding in repository — on-chain settlement, messaging, and auction logic **not** feature-complete  
+**Implementation status:** Phase 1 feature-complete locally (Stages 1–6 done) — contracts, backend services, frontend, E2E tests, load tests, and gas benchmarks all complete. Next milestone: testnet deployment (Stage 8).  
 **Target launch (documented):** Q3 2026
 
 ---
@@ -635,7 +635,7 @@ Week 12:     Full public launch
 
 | | |
 |:---|:---|
-| **Version** | 1.0 |
-| **Last updated** | 2026-05-06 |
-| **Status** | Baseline MVP scope — update acceptance criteria as implementation lands |
+| **Version** | 1.1 |
+| **Last updated** | 2026-05-09 |
+| **Status** | Phase 1 feature-complete locally. Contracts (94 Foundry tests), backend (109 unit + 4 E2E tests), frontend (Stage 5.Z), gas benchmarks all done. Open items: testnet deploy (Stage 8), internal security review (Stage 7), external audit before high-volume mainnet. |
 | **Owner** | Maintainers (see [README](../README.md)) |

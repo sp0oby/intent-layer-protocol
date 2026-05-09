@@ -15,6 +15,7 @@ These files describe **Intent Layer Protocol** — vision, architecture, Phase 1
 | [Stage 2 audit](STAGE_2_AUDIT.md) | LayerZero OApp integration review |
 | [Stage 3 audit](STAGE_3_AUDIT.md) | `SolverAuction` integration review |
 | [Stage 3 final review](STAGE_3_FINAL_REVIEW.md) | Pre-Stage-4 gate, R-01 to R-18 closure, tooling roadmap |
+| [Gas benchmarks](GAS_BENCHMARKS.md) | Stage 6 gas report: per-function costs, bytecode sizes, estimated user costs |
 | [GitHub Projects and issues](GITHUB_PROJECT_AND_ISSUES.md) | Maintainer board setup and issue templates |
 
 **Security:** [SECURITY.md](../SECURITY.md)

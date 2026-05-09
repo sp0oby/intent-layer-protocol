@@ -31,12 +31,12 @@ Week 5-6 — Auction & Solvers
 Week 7 — Frontend MVP
 - [x] Implement React swap UI (Next.js) with MetaMask via wagmi — **Across-style swap card** with combined token+chain picker dialog, indicative-rate auto-fill, slippage selector, settings popover (deadline + refund-to override), chained approve + submit flow. Next 16 / React 19 / Tailwind v4 / shadcn / wagmi v3 + viem / TanStack Query / Zustand. State-driven status page with live solver-bid feed and per-state tx-hash explorer chips. Mobile-responsive at 375px. (Stage 5.Z complete)
 - [x] Show intent lifecycle and links to tx explorers — animated status timeline ships in 5.3 (per-state explorer links pending tx-hash exposure in IntentRecord, task #67)
-- [ ] Connect frontend to backend API and test submission flow — code complete; end-to-end manual verification blocked by issue #29 (suspected CORS)
+- [x] Connect frontend to backend API and test submission flow — CORS allowlist (`localhost:3000` + `127.0.0.1:3000`) wired in `backend/src/server.ts`; closes #29; end-to-end verified on `npm run local-stack`
 
 Week 8 — Integration & Tests
-- [ ] End-to-end integration tests (Foundry + backend + frontend)
-- [ ] Load testing for matching engine (100 concurrent intents)
-- [ ] Gas benchmarking and optimization
+- [x] End-to-end integration tests (Foundry + backend + frontend) — Stage 6: 4/4 E2E tests pass (full-roundtrip P2P, cancellation, pg-smoke ×2); 105 unit tests pass; Anvil leak-on-timeout fixed in `spawnAnvil`
+- [x] Load testing for matching engine (100 concurrent intents) — Stage 6: 4 load tests (50 matched pairs, no double-match, expired-skip, price-skip) all pass in 9 ms; 109 unit tests pass
+- [x] Gas benchmarking and optimization — Stage 6: see `docs/GAS_BENCHMARKS.md`; submitIntent 289k median, executeMatching 418k max (incl. LZ send), cancelIntent 50k, IntentSettler 16,694 bytes (32% headroom); no critical optimization needed for Phase 1
 
 Week 9 — Hardening (budget-conscious)
 - [ ] Internal code review, Slither runs, Foundry fuzzing, and security checklist
@@ -75,7 +75,7 @@ Backend
 - [x] Matching engine finds correct opposite intents — `MatchingLoop` ticks every 5s; `findOppositeIntent` enforces chain/token/both-sides minimums; expiry filter
 - [x] Solver API exposes unmatched intents and accepts proposals — `GET /api/intents/unmatched|auctioning|:hash`, `POST /api/solver/proposals` with on-chain `proposalDigest` ECDSA verification, `WS /ws?intentHash=` for real-time updates
 - [x] Database schema enforces invariants — Intent struct mirror with `refund_to`/`nonce`/packed-meta columns; `solver_fee_bps` constrained to uint16; `indexer_cursors (chain_id, contract_address)` PK prevents duplicate cursors (Stage 4)
-- [ ] End-to-end integration test against deployed contracts on local Anvil (in progress)
+- [x] End-to-end integration test against deployed contracts on local Anvil — Stage 6: full P2P round-trip (Alice ETH → Bob USDC across two Anvils, LZ relayer, indexer, matcher, chain-submitter) passes; cancellation round-trip passes; pg-mem schema smoke passes
 
 Frontend
 - [x] User can submit intents via wallet (MetaMask) — Stage 5.Z verified end-to-end on `npm run local-stack` (multi-wallet picker, chained approve + submit, indicative-rate auto-fill + slippage selector, settings popover for deadline + refund-to)
@@ -107,6 +107,6 @@ Operations
 
 | | |
 |:---|:---|
-| **Version** | 1.2 |
-| **Last updated** | 2026-05-08 |
-| **Status** | Weeks 1-6 contract scope complete; Stage 4 (backend services) feature-complete locally with E2E coverage; Stage 5 (frontend) feature-complete and pushed to main with full local-stack verification; Stage 6 (integration tests + gas benchmarking) is the next milestone, with auction → settlement chaining (#30) carried over from Stage 5 |
+| **Version** | 1.4 |
+| **Last updated** | 2026-05-09 |
+| **Status** | Weeks 1-7 complete. Stage 6 (integration tests + load testing + gas benchmarking) fully done: 4/4 E2E tests pass, 109 unit tests pass, load test proves 50 pairs match in 9ms with no double-matches, gas benchmarks documented in GAS_BENCHMARKS.md. Next: Week 9 hardening (internal security review, Slither, fuzzing) and auction → settlement chaining (#30) |

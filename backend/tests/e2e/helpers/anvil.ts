@@ -43,6 +43,22 @@ const ANVIL_KEYS = [
 
 const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
+function killChild(child: ChildProcess): Promise<void> {
+  return new Promise<void>((resolve) => {
+    if (child.exitCode !== null || child.killed) {
+      resolve();
+      return;
+    }
+    child.once('exit', () => resolve());
+    // SIGTERM first; on Windows this is translated to TerminateProcess.
+    child.kill('SIGTERM');
+    setTimeout(() => {
+      if (child.exitCode === null && !child.killed) child.kill('SIGKILL');
+      resolve();
+    }, 2000);
+  });
+}
+
 export async function spawnAnvil(opts: {chainId: number; port: number}): Promise<AnvilHandle> {
   const child: ChildProcess = spawn(
     'anvil',
@@ -57,13 +73,20 @@ export async function spawnAnvil(opts: {chainId: number; port: number}): Promise
     {stdio: 'pipe'}
   );
 
-  // Surface any spawn errors so test failures point at Anvil, not vitest.
   let stderr = '';
   child.stderr?.on('data', (chunk: Buffer) => {
     stderr += chunk.toString('utf8');
   });
+
+  // Track whether Anvil exited before we finished polling.
+  let childExitError: Error | null = null;
   child.on('error', (err) => {
-    throw new Error(`anvil spawn failed: ${err.message}\n${stderr}`);
+    childExitError = new Error(`anvil spawn failed: ${err.message}\n${stderr}`);
+  });
+  child.on('exit', (code) => {
+    if (code !== 0 && code !== null) {
+      childExitError = new Error(`anvil exited early (code ${code}) — port ${opts.port} may be in use.\nstderr: ${stderr}`);
+    }
   });
 
   const rpcUrl = `http://127.0.0.1:${opts.port}`;
@@ -72,34 +95,40 @@ export async function spawnAnvil(opts: {chainId: number; port: number}): Promise
   // path on Windows + Anvil 1.5.1, leading to cached stale state.
   const provider = new JsonRpcProvider(rpcUrl);
 
-  // Wait for Anvil to accept JSON-RPC. Up to 5s.
-  const deadline = Date.now() + 5000;
+  // Wait for Anvil to accept JSON-RPC. Up to 20s — Windows startup is slower.
+  const deadline = Date.now() + 20_000;
+  let connected = false;
   while (Date.now() < deadline) {
+    if (childExitError) {
+      // Anvil process died — kill provider polling and surface the error.
+      provider.destroy();
+      throw childExitError;
+    }
     try {
       await provider.getBlockNumber();
+      connected = true;
       break;
     } catch {
       await wait(100);
     }
   }
-  // One last check that throws if still not ready.
-  await provider.getBlockNumber();
+
+  if (!connected) {
+    // Timed out — kill the child so it doesn't leak into the next test run.
+    provider.destroy();
+    await killChild(child);
+    throw new Error(
+      `anvil on port ${opts.port} did not respond within 20s.\nstderr: ${stderr}`
+    );
+  }
+
+  const stop = async (): Promise<void> => {
+    provider.destroy();
+    await killChild(child);
+  };
 
   const wallets = ANVIL_KEYS.map((key) => new Wallet(key, provider));
   const accounts = wallets.map((w) => new NonceManager(w));
-
-  const stop = async (): Promise<void> => {
-    if (child.killed) return;
-    child.kill('SIGTERM');
-    await new Promise<void>((resolve) => {
-      child.once('exit', () => resolve());
-      // Hard timeout — Anvil should always exit immediately on SIGTERM.
-      setTimeout(() => {
-        if (!child.killed) child.kill('SIGKILL');
-        resolve();
-      }, 2000);
-    });
-  };
 
   return {rpcUrl, chainId: opts.chainId, provider, accounts, wallets, stop};
 }

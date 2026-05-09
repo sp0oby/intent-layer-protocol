@@ -1,6 +1,6 @@
 # Intent Layer Protocol — Technology Stack
 
-**Audience:** Engineers joining the project · **Version:** 1.0 · **Status:** Baseline choices for Phase 1; adjust via ADR or PR when swapping tools  
+**Audience:** Engineers joining the project · **Version:** 1.1 · **Status:** Reflects Phase 1 feature-complete state (Stages 1–6); update via PR when swapping tools  
 **See also:** [README](../README.md) · [Architecture](ARCHITECTURE.md) · [MVP specification](MVP_SPECIFICATION.md) · [Contributing](../CONTRIBUTING.md)
 
 ---
@@ -18,9 +18,9 @@ Use **boring, proven tech**. No experimental frameworks or languages. Every comp
 ## Smart Contracts (On-Chain Layer)
 
 ### Language
-- **Solidity 0.8.20+**
-- Reason: EVM standard, security improvements in 0.8
-- Avoid: experimental versions
+- **Solidity 0.8.26** (pinned in `foundry.toml`)
+- Reason: EVM standard; 0.8.26 is the latest stable with optimizer + via-ir off for predictable gas
+- Avoid: experimental / nightly versions
 
 ### Framework
 
@@ -58,47 +58,61 @@ Paths below are relative to the [`contracts/`](../contracts/) Foundry project (`
 
 ```
 contracts/
-├── foundry.toml
+├── foundry.toml                # optimizer 200 runs, Solidity 0.8.26
 ├── remappings.txt
 ├── src/
 │   ├── ChainPeerRegistry.sol   # chainId → LayerZero EID + route allowlist (deploy per network)
-│   ├── IntentSettler.sol       # settlement skeleton; constructor takes optional registry address
-│   ├── SolverAuction.sol
+│   ├── IntentSettler.sol       # EIP-712 escrow, CEI, LZ OApp send/receive, auction wiring
+│   ├── SolverAuction.sol       # signed proposals, deterministic ranking, settler-gated window
 │   ├── interfaces/
 │   │   ├── IChainPeerRegistry.sol
-│   │   └── IIntentSettler.sol
+│   │   ├── IIntentSettler.sol
+│   │   └── ISolverAuction.sol
 │   └── libraries/
-│       ├── IntentHash.sol
+│       ├── IntentHash.sol      # EIP-712 structured hash
 │       ├── SignatureValidator.sol
-│       └── SafeTransfer.sol
+│       └── SafeTransfer.sol    # USDT-style non-bool ERC-20 returns
 ├── test/
 │   ├── ChainPeerRegistry.t.sol
 │   ├── IntentSettler.t.sol
+│   ├── IntentSettler.lz.t.sol  # full cross-chain LZ round-trip + security guards
+│   ├── IntentSettler.solver.t.sol
+│   ├── IntentSettler.invariant.t.sol  # fuzz tests
 │   ├── Integration.t.sol
-│   └── SolverAuction.t.sol
-└── lib/
-    └── forge-std/              # vendored — see contracts/README.md
+│   ├── IntentHash.t.sol
+│   ├── SolverAuction.t.sol
+│   └── mocks/
+│       ├── MockLzEndpoint.sol  # queue + deliverNext / dropNext / deliverInbound
+│       ├── MockERC20.sol
+│       └── MockUSDT.sol        # non-bool return transfer
+└── lib/                        # vendored via forge install --no-git --shallow
+    ├── forge-std/
+    ├── openzeppelin-contracts/ # v5.1.0
+    ├── LayerZero-v2/
+    └── devtools/               # @layerzerolabs/oapp-evm
 ```
 
-Token interfaces (e.g. `IERC20`) and LayerZero receiver-facing types typically come from **dependencies** (`forge install`) or `@layerzerolabs/*` when integrated — they are not stubs in `src/interfaces/` yet. Add a dedicated **`test/CrossChain.t.sol`** (or similar) when the LayerZero harness lands.
+**Test count:** 94 Foundry tests pass (`forge test`) + 3 fuzz/invariant suites.  
+**Gas report:** see `docs/GAS_BENCHMARKS.md`.
 
 ### Tooling
 
 ```bash
 # Testing
-forge test                    # Run Foundry tests
-forge coverage               # Code coverage
-forge gas-snapshot          # Gas benchmarking
+cd contracts
+forge test                        # 94 tests (all suites)
+forge test --gas-report           # per-function gas table (see GAS_BENCHMARKS.md)
+forge test --match-test "Fuzz"    # fuzz / invariant suites only
 
-# Linting
-solhint contracts/**         # Linting
-slither .                   # Security analysis
+# Security
+slither .                         # static analysis (clean as of Stage 3)
 
-# Deployment
-forge script Deploy.s.sol    # Deployment script
+# Deployment (Stage 8)
+forge script script/Deploy.s.sol --rpc-url $SEPOLIA_RPC --broadcast
+forge verify-contract <addr> IntentSettler --etherscan-api-key $KEY
 
 # Local node
-Foundry anvil               # Local blockchain
+anvil --chain-id 31337 --port 8545
 ```
 
 ---
@@ -114,18 +128,48 @@ Foundry anvil               # Local blockchain
 
 ```
 backend/
-├── services/
-│   ├── indexer/          (monitors blockchain events)
-│   ├── matching-engine/  (finds matching intents)
-│   ├── auction-oracle/   (solver auction coordination)
-│   └── api/              (REST API for solvers + frontend)
-├── database/
-│   └── schema.sql        (PostgreSQL schema)
+├── src/
+│   ├── index.ts                    # entry: boots all services
+│   ├── runtime.ts                  # env config + RPC providers
+│   ├── server.ts                   # Express API + CORS + WS upgrade
+│   ├── db/
+│   │   ├── pool.ts                 # pg Pool singleton
+│   │   ├── repository.ts           # OrderBookRepository interface + pgRepository
+│   │   └── publishing-repository.ts # wraps repo; publishes events to EventBus
+│   ├── services/
+│   │   ├── indexer.ts              # IntentIndexer: resumable getLogs polling
+│   │   ├── indexer-handlers.ts     # event → repository mapper (settler + auction)
+│   │   ├── matching.ts             # findOppositeIntent algorithm
+│   │   ├── matching-loop.ts        # MatchingLoop: ticks every 5s, greedy P2P scan
+│   │   ├── auction-orchestrator.ts # AuctionOrchestrator: openAuction + finalize
+│   │   ├── chain-submitters.ts     # buildChainSubmitters: ethers calls → contracts
+│   │   ├── proposal-verifier.ts    # ECDSA proposalDigest verification
+│   │   ├── event-bus.ts            # in-process EventEmitter for WS fan-out
+│   │   └── ws-server.ts            # WS server: per-intent subscriptions
+│   ├── bot/
+│   │   └── solver-bot.ts           # reference solver: polls auctioning, bids, submits
+│   ├── abis/                       # extracted by scripts/extract-abis.mjs
+│   └── types/
+│       └── intent.ts               # IntentRecord, IntentState, matching types
 ├── tests/
-│   ├── indexer.test.ts
-│   ├── matching.test.ts
-│   └── auction.test.ts
-└── docker-compose.yml    (local dev environment)
+│   ├── *.test.ts                   # 109 unit tests (vitest)
+│   └── e2e/
+│       ├── full-roundtrip.test.ts  # P2P across two Anvils (full stack)
+│       ├── cancellation.test.ts    # submit → cancel → indexer observes
+│       ├── pg-smoke.test.ts        # migrations parse + CHECK constraints
+│       └── helpers/
+│           ├── anvil.ts            # spawn/stop Anvil; leak-safe on timeout
+│           ├── deploy-stack.ts     # deploy contracts via ethers ContractFactory
+│           ├── lz-relayer.ts       # cross-Anvil LZ message ferry
+│           ├── in-memory-repo.ts   # in-memory OrderBookRepository for E2E
+│           └── artifacts.ts        # reads Foundry out/ artifacts
+├── scripts/
+│   ├── extract-abis.mjs            # copies ABIs from contracts/out/
+│   └── local-stack.ts              # npm run local-stack (Anvil + Postgres + all services)
+├── db/
+│   └── migrations/                 # SQL migrations (applied by local-stack)
+├── vitest.config.ts
+└── vitest.e2e.config.ts
 ```
 
 ### Key Frameworks & Libraries
@@ -187,19 +231,36 @@ describe('Matching Engine', () => {
 ```json
 {
   "dependencies": {
-    "express": "^4.18.0",
-    "ethers": "^6.0.0",
-    "pg": "^8.10.0",
-    "redis": "^4.6.0",
-    "dotenv": "^16.0.0",
-    "typescript": "^5.0.0"
+    "express": "^4.21.1",
+    "ethers": "^6.13.4",
+    "pg": "^8.13.1",
+    "ws": "^8.20.0",
+    "cors": "^2.8.6",
+    "dotenv": "^16.4.5"
   },
   "devDependencies": {
-    "vitest": "^0.34.0",
-    "@types/node": "^20.0.0",
-    "@types/express": "^4.17.0"
+    "vitest": "^2.1.3",
+    "tsx": "^4.19.1",
+    "pg-mem": "^3.0.14",
+    "supertest": "^7.2.2",
+    "typescript": "^5.6.3",
+    "@types/node": "^20",
+    "@types/express": "^4.17.21",
+    "@types/pg": "^8.11.10",
+    "@types/ws": "^8.18.1"
   }
 }
+```
+
+Note: **No Redis.** Event fan-out uses an in-process `EventBus` (EventEmitter). Redis is a Phase 2 addition for horizontal scaling.
+
+### Test commands
+
+```bash
+cd backend
+npm test              # 109 unit tests
+npm run test:e2e      # 4 E2E tests (spawns Anvil, deploys contracts)
+npm run local-stack   # full dev stack (Anvil + Postgres + all services)
 ```
 
 ### Configuration
@@ -213,7 +274,6 @@ DB_PORT=5432
 DB_NAME=intent_protocol
 DB_USER=postgres
 DB_PASSWORD=...
-REDIS_URL=redis://localhost:6379
 LAYERZERO_ETH_ADDRESS=0x...
 LAYERZERO_BASE_ADDRESS=0x...
 ```
@@ -223,21 +283,45 @@ LAYERZERO_BASE_ADDRESS=0x...
 ## Frontend (Web UI)
 
 ### Language
-- **TypeScript 5 + React 19**
-- Reason: Type-safe, massive ecosystem, best for crypto UX. React 19 strict rules (purity / set-state-in-effect / refs / static-components) enforced.
+- **TypeScript 5 + React 19.2**
+- React 19 strict rules (purity / set-state-in-effect / refs / static-components) enforced.
 
 ### Framework
-- **Next.js 16** (App Router, Turbopack)
-  - Server Components + dynamic params (`Promise<{id: string}>` for route segments)
+- **Next.js 16.2** (App Router, Turbopack dev server)
+  - Server Components + dynamic params (`Promise<{id: string}>` for route segments — Next 16 async params)
   - Metadata API (title template, OpenGraph, Twitter, viewport themeColor)
-  - Built-in dev server with fast refresh
 
 ### Styling + UI
 
-- **Tailwind CSS v4** (CSS-first config in `globals.css`)
-- **shadcn/ui** primitives (base-ui under the hood) — Dialog, Select, Input, Button, Tabs, Skeleton, Card, Sonner toast
-- **Framer Motion** — quiet motion only (no celebratory animations); state-driven cyan-glow on RoutePreview steps
-- Glass-card design language with `backdrop-blur-2xl`, deep-navy + electric-cyan oklch palette
+- **Tailwind CSS v4.2** (CSS-first config in `globals.css` — no `tailwind.config.js`)
+- **shadcn/ui v4** on top of **Radix UI** primitives — Dialog, Select, Input, Button, Tabs, Skeleton, Card, Badge, Separator, Sheet, Tooltip, Table
+- **Framer Motion v12** — quiet motion only; state-driven cyan-glow on RoutePreview lifecycle steps
+- **Sonner v2** — toast notifications
+- Design: glass-card (`backdrop-blur-2xl`), deep-navy + electric-cyan oklch palette, asymmetric layouts
+
+### Installed Packages (exact)
+
+```json
+{
+  "next": "^16.2.6",
+  "react": "^19.2.0",
+  "viem": "^2.48.8",
+  "wagmi": "^3.6.9",
+  "@tanstack/react-query": "^5.100.9",
+  "zustand": "^5.0.13",
+  "tailwindcss": "^4.2.4",
+  "framer-motion": "^12.38.0",
+  "shadcn": "^4.7.0",
+  "sonner": "^2.0.7",
+  "@coinbase/wallet-sdk": "^4.3.7",
+  "@metamask/connect-evm": "~1.0.0",
+  "@walletconnect/ethereum-provider": "^2.23.9",
+  "@safe-global/safe-apps-sdk": "^9.1.0",
+  "lucide-react": "^1.14.0"
+}
+```
+
+Note: **No recharts.** The stats strip uses static mock data; a chart library is a Phase 2 addition.
 
 ### Key Libraries
 
@@ -311,49 +395,43 @@ const { on, off } = publicClient.watchContractEvent({
 ```
 frontend/
 ├── app/
-│   ├── layout.tsx          (root layout)
-│   ├── page.tsx            (landing page)
+│   ├── layout.tsx              # root layout, AppShell, ThemeProvider
+│   ├── providers.tsx           # wagmi + TanStack Query + Sonner
+│   ├── page.tsx                # landing: HeroVisual, StatsStrip, HowItWorks, ActivityTicker
 │   ├── swap/
-│   │   └── page.tsx        (swap interface)
+│   │   └── page.tsx            # swap card: SwapForm, SwapPreview, SubmitIntentButton
 │   ├── intent/
-│   │   └── [id]/page.tsx   (intent status)
-│   ├── history/
-│   │   └── page.tsx        (transaction history)
-│   └── api/
-│       └── intents/route.ts  (dummy or proxy API for local dev)
+│   │   └── [id]/
+│   │       ├── page.tsx        # server component; passes params to client
+│   │       └── status-client.tsx  # real-time WS, IntentStatusTimeline, IntentActions, RoutePreview
+│   └── history/
+│       └── page.tsx            # paginated intent history table
 ├── components/
-│   ├── Navbar.tsx
-│   ├── SwapForm.tsx
-│   ├── IntentStatus.tsx
-│   └── WalletConnect.tsx
-├── hooks/
-│   ├── useIntent.ts
-│   ├── useMatchStatus.ts
-│   └── useSettlement.ts
-├── utils/
-│   ├── chains.ts
-│   ├── tokens.ts
-│   └── formatting.ts
-└── styles/
-    └── globals.css
-```
-
-### Frontend Dependencies
-
-```json
-{
-  "dependencies": {
-    "next": "^14.2.0",
-    "react": "^18.3.0",
-    "wagmi": "^2.0.0",
-    "viem": "^2.0.0",
-    "@tanstack/react-query": "^5.0.0",
-    "zustand": "^5.0.0",
-    "tailwindcss": "^3.4.0",
-    "framer-motion": "^11.0.0",
-    "recharts": "^2.10.0"
-  }
-}
+│   ├── AppShell.tsx            # header / nav / footer
+│   ├── SwapForm.tsx            # amount inputs, slippage, TokenPickerDialog trigger
+│   ├── SwapPreview.tsx         # indicative rate + fee summary
+│   ├── SwapSettings.tsx        # deadline + refund-to popover
+│   ├── SubmitIntentButton.tsx  # chained approve → submitIntent wagmi flow
+│   ├── TokenPickerDialog.tsx   # combined chain + token picker (mobile-aware)
+│   ├── TokenChainChip.tsx      # token + chain pill display
+│   ├── RoutePreview.tsx        # lifecycle steps with LZ animation + tx-hash chips
+│   ├── IntentStatusTimeline.tsx
+│   ├── IntentActions.tsx       # cancel / refundIfLzTimeout buttons
+│   ├── WalletButton.tsx        # connect / address display
+│   ├── WalletPickerDialog.tsx  # multi-wallet picker (MetaMask, Coinbase, WC, Safe)
+│   ├── NetworkBanner.tsx       # wrong-network warning
+│   ├── HeroVisual.tsx          # landing hero illustration
+│   ├── StatsStrip.tsx          # protocol stats bar
+│   ├── HowItWorks.tsx          # landing explainer
+│   ├── ActivityTicker.tsx      # live-activity ticker on landing
+│   ├── Logo.tsx
+│   ├── icons/
+│   │   ├── ChainIcon.tsx
+│   │   └── TokenIcon.tsx
+│   └── ui/                     # shadcn/ui primitives
+├── scripts/
+│   └── extract-abis.mjs        # copies ABIs from contracts/out/
+└── styles / globals.css        # Tailwind v4 CSS-first config + oklch palette
 ```
 
 ---
@@ -364,54 +442,18 @@ frontend/
 - **PostgreSQL 15+**
 - Reason: ACID transactions, JSON support, proven reliability
 
-### Schema
+### Schema (actual — `backend/db/migrations/`)
 
-```sql
--- Intents table
-CREATE TABLE intents (
-    id BIGSERIAL PRIMARY KEY,
-    intent_hash BYTEA UNIQUE NOT NULL,
-    user_address BYTEA NOT NULL,
-    source_chain_id INT NOT NULL,
-    source_token BYTEA NOT NULL,
-    source_amount NUMERIC NOT NULL,
-    dest_chain_id INT NOT NULL,
-    dest_token BYTEA NOT NULL,
-    min_dest_amount NUMERIC NOT NULL,
-    deadline BIGINT NOT NULL,
-    state VARCHAR(20) NOT NULL DEFAULT 'PENDING',
-    created_at TIMESTAMP DEFAULT NOW(),
-    settled_at TIMESTAMP,
-    INDEX idx_state (state),
-    INDEX idx_chains (source_chain_id, dest_chain_id),
-    INDEX idx_deadline (deadline),
-    INDEX idx_user (user_address)
-);
+Key design choices over the spec baseline:
+- All amounts stored as `TEXT` (not NUMERIC) to avoid uint256 precision loss
+- `refund_to` column added for ERC-7683 alignment
+- `nonce` column for replay protection
+- Packed `submitted_at_block_ts` for auction delay calculation
+- Per-state tx-hash columns (`submit_tx_hash`, `match_tx_hash`, `settle_tx_hash`, etc.) so the frontend can link to block explorers
+- `solver_fee_bps` constrained to `SMALLINT` (matches uint16 on-chain)
+- `indexer_cursors (chain_id, contract_address)` composite PK prevents duplicate cursors — advancing inside the same Postgres transaction as event writes makes crash-recovery safe
 
--- Matches table
-CREATE TABLE matches (
-    id BIGSERIAL PRIMARY KEY,
-    intent_hash_a BYTEA NOT NULL,
-    intent_hash_b BYTEA NOT NULL,
-    matched_at TIMESTAMP DEFAULT NOW(),
-    settled_at TIMESTAMP,
-    FOREIGN KEY (intent_hash_a) REFERENCES intents(intent_hash),
-    FOREIGN KEY (intent_hash_b) REFERENCES intents(intent_hash)
-);
-
--- Solver proposals table
-CREATE TABLE solver_proposals (
-    id BIGSERIAL PRIMARY KEY,
-    intent_hash BYTEA NOT NULL,
-    solver_address BYTEA NOT NULL,
-    proposed_output_amount NUMERIC NOT NULL,
-    solver_fee_bps INT NOT NULL,
-    signature BYTEA NOT NULL,
-    submitted_at TIMESTAMP DEFAULT NOW(),
-    accepted BOOLEAN DEFAULT FALSE,
-    FOREIGN KEY (intent_hash) REFERENCES intents(intent_hash)
-);
-```
+The schema is verified by the pg-mem smoke test (`backend/tests/e2e/pg-smoke.test.ts`) on every CI run.
 
 ---
 
@@ -566,6 +608,6 @@ logger.info({ intentHash }, 'Intent submitted');
 
 | | |
 |:---|:---|
-| **Version** | 1.0 |
-| **Last updated** | 2026-05-06 |
-| **Status** | Active baseline — bump version when stack changes materially |
+| **Version** | 1.1 |
+| **Last updated** | 2026-05-09 |
+| **Status** | Reflects Phase 1 feature-complete state (Stages 1–6 done). Frontend versions updated to reflect actual installed packages. Backend structure updated to reflect actual source layout. Redis removed (Phase 2). |
